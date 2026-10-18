@@ -3168,6 +3168,18 @@
             "type": "string",
             "title": "Telefono"
           },
+          "whatsapp_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Url",
+            "description": "HU-06: link wa.me con el mensaje de contacto precargado. null si el teléfono no es válido (CA03)."
+          },
           "email": {
             "type": "string",
             "title": "Email",
@@ -3396,6 +3408,18 @@
           "telefono": {
             "type": "string",
             "title": "Telefono"
+          },
+          "whatsapp_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Url",
+            "description": "HU-06: link wa.me con el mensaje de contacto precargado. null si el teléfono no es válido (CA03)."
           },
           "email": {
             "type": "string",

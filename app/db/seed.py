@@ -107,6 +107,16 @@ OFERENTES_DEMO = [
         telefono="3564400666",
         estado_verificacion=EstadoVerificacion.RECHAZADO,
     ),
+    # HU-06 CA03: teléfono fuera de formato (0 inicial). La API no deja guardarlo,
+    # así que el seed lo carga directo: el perfil existe pero no tiene WhatsApp.
+    dict(
+        email="pablo.ruiz@offix.example.com",
+        nombre="Pablo Ruiz",
+        categoria="Plomero",
+        dni_cuit="20321230000",
+        telefono="0351-4400888",
+        estado_verificacion=EstadoVerificacion.PENDIENTE,
+    ),
     # Caso de referencia de QA (HU-04): perfil completo con guardia y sin domingos.
     dict(
         email="serena.ludena@offix.example.com",

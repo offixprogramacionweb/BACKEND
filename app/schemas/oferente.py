@@ -212,6 +212,10 @@ class OferentePublicoOut(BaseModel):
     especialidad: str | None = None
     experiencia: ExperienciaRef | None = None
     telefono: str
+    whatsapp_url: str | None = Field(
+        default=None,
+        description="HU-06: link wa.me con el mensaje de contacto precargado. null si el teléfono no es válido (CA03).",
+    )
     email: str = Field(description="El mismo correo con el que el Profesional entra (D6). Es público por D7.")
     dias_atencion: list[int] = Field(default_factory=list)
     hora_inicio_atencion: str | None = None

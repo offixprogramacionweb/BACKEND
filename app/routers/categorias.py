@@ -3,16 +3,29 @@ from sqlalchemy.orm import Session
 
 from app.core.deps import require_admin
 from app.db.database import get_db
-from app.models.categoria import Categoria
+from app.models.categoria import Categoria, EstadoCategoria
 from app.schemas.categoria import CategoriaCreate, CategoriaOut, CategoriaUpdate
 
 router = APIRouter(prefix="/api/v1/categorias", tags=["Categorías"])
 
 
-@router.get("", response_model=list[CategoriaOut], summary="Listar categorías/oficios (público)")
+@router.get("", response_model=list[CategoriaOut], summary="Listar categorías/oficios activas (público)")
 def listar_categorias(db: Session = Depends(get_db)):
-    """RF5 — Navegación pública, sin login requerido."""
-    return db.query(Categoria).all()
+    """RF5 — Navegación pública, sin login requerido. Solo las activas: es la
+    misma lista que usa el alta de Profesional (caso A7 de HU-04 v2.2)."""
+    return db.query(Categoria).filter(Categoria.estado == EstadoCategoria.ACTIVA).order_by(Categoria.nombre).all()
+
+
+@router.get(
+    "/todas",
+    response_model=list[CategoriaOut],
+    dependencies=[Depends(require_admin)],
+    summary="Listar todas las categorías, también las inactivas (solo Administrador)",
+    responses={401: {"description": "Falta token"}, 403: {"description": "Requiere rol Administrador"}},
+)
+def listar_todas_las_categorias(db: Session = Depends(get_db)):
+    """RF18 — Para que el Administrador vea las inactivas y pueda reactivarlas."""
+    return db.query(Categoria).order_by(Categoria.nombre).all()
 
 
 @router.post(

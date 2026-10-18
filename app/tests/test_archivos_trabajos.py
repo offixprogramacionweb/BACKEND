@@ -87,7 +87,10 @@ def test_imagen_de_4_8_mb_se_acepta(client, storage, oferente):
     assert _pedir_subida(client, token, tamano=int(4.8 * MB)).status_code == 201
 
 
-def test_sin_supabase_configurado_responde_503(client, db_session):
+def test_sin_supabase_configurado_responde_503(client, db_session, monkeypatch):
+    # Se vacían las credenciales a propósito: el test no tiene que depender del .env local.
+    monkeypatch.setattr(settings, "supabase_url", "")
+    monkeypatch.setattr(settings, "supabase_service_role_key", "")
     token, _ = crear_oferente_completo(client, db_session, email="sin.storage@test.com", dni_cuit="20-30111223-9")
 
     respuesta = _pedir_subida(client, token)

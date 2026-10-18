@@ -35,9 +35,9 @@ def cuit_valido(cuit: str) -> bool:
 
 
 def normalizar_dni_cuit(valor: str) -> str:
-    """Quita guiones y puntos; quedan 7, 8 u 11 dígitos. Se guarda solo el número."""
+    """Quita guiones y puntos; quedan 8 (DNI) u 11 (CUIT) dígitos. Se guarda solo el número."""
     limpio = valor.replace("-", "").replace(".", "")
-    if not DIGITOS_RE.fullmatch(limpio) or len(limpio) not in (7, 8, 11):
+    if not DIGITOS_RE.fullmatch(limpio) or len(limpio) not in (8, 11):
         raise PydanticCustomError("dni_cuit_invalido", "Debe ingresar un formato válido en el campo DNI/CUIT")
     if len(limpio) == 11 and not cuit_valido(limpio):
         raise PydanticCustomError("dni_cuit_invalido", "Debe ingresar un formato válido en el campo DNI/CUIT")
@@ -152,7 +152,7 @@ class OferenteRegistro(_DatosOferente):
     )
 
     nombre: str = Field(min_length=2, max_length=150, description="Nombre y apellido, o razón social. Un solo campo.")
-    dni_cuit: str = Field(description="7 u 8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales.")
+    dni_cuit: str = Field(description="8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales.")
     telefono: str = Field(description="10 dígitos con guion opcional. Sin 0, 15 ni +54.")
     categoria_id: int = Field(description="Categoría u oficio principal, activa.")
     dias_atencion: list[int] = Field(description="Días ISO: 1 = lunes … 7 = domingo. Al menos uno.")

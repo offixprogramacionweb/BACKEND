@@ -940,8 +940,8 @@
         "tags": [
           "Categorías"
         ],
-        "summary": "Listar categorías/oficios (público)",
-        "description": "RF5 — Navegación pública, sin login requerido.",
+        "summary": "Listar categorías/oficios activas (público)",
+        "description": "RF5 — Navegación pública, sin login requerido. Solo las activas: es la\nmisma lista que usa el alta de Profesional (caso A7 de HU-04 v2.2).",
         "operationId": "listar_categorias_api_v1_categorias_get",
         "responses": {
           "200": {
@@ -1003,6 +1003,43 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/categorias/todas": {
+      "get": {
+        "tags": [
+          "Categorías"
+        ],
+        "summary": "Listar todas las categorías, también las inactivas (solo Administrador)",
+        "description": "RF18 — Para que el Administrador vea las inactivas y pueda reactivarlas.",
+        "operationId": "listar_todas_las_categorias_api_v1_categorias_todas_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoriaOut"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Todas Las Categorias Api V1 Categorias Todas Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
           }
         },
         "security": [
@@ -3660,7 +3697,7 @@
           "dni_cuit": {
             "type": "string",
             "title": "Dni Cuit",
-            "description": "7 u 8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales."
+            "description": "8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales."
           }
         },
         "additionalProperties": false,

@@ -8,7 +8,7 @@ from app.models.matricula import Matricula
 from app.models.oferente import Oferente
 from app.models.usuario import EstadoCuenta, Usuario
 from app.schemas.oferente import cuit_valido, normalizar_dni_cuit
-from app.tests.conftest import crear_admin_db, crear_categoria_db, crear_oferente_completo, formulario_registro, registrar_y_loguear
+from app.tests.conftest import PASSWORD, crear_admin_db, crear_categoria_db, crear_oferente_completo, formulario_registro, registrar_y_loguear
 
 
 def _auth(token):
@@ -57,6 +57,44 @@ def test_catalogo_no_lista_categorias_inactivas(client, db_session):
     db_session.commit()
 
     assert client.get("/api/v1/catalogos/registro-oferente").json()["categorias"] == []
+
+
+# --- Listado de categorías (HU-04 v2.2, caso A7) -----------------------------
+
+
+def test_listado_publico_de_categorias_solo_trae_activas_ordenadas(client, db_session):
+    from app.models.categoria import EstadoCategoria
+
+    crear_categoria_db(db_session, nombre="Plomero")
+    inactiva = crear_categoria_db(db_session, nombre="Albañil")
+    inactiva.estado = EstadoCategoria.INACTIVA
+    crear_categoria_db(db_session, nombre="Electricista")
+    db_session.commit()
+
+    respuesta = client.get("/api/v1/categorias")
+
+    assert respuesta.status_code == 200
+    assert [c["nombre"] for c in respuesta.json()] == ["Electricista", "Plomero"]
+
+
+def test_listado_de_todas_las_categorias_solo_para_administrador(client, db_session):
+    from app.models.categoria import EstadoCategoria
+
+    crear_categoria_db(db_session, nombre="Plomero")
+    inactiva = crear_categoria_db(db_session, nombre="Albañil")
+    inactiva.estado = EstadoCategoria.INACTIVA
+    db_session.commit()
+    token_oferente = registrar_y_loguear(client, "no.admin.categorias@test.com")
+    crear_admin_db(db_session, email="admin.categorias@test.com")
+    token_admin = client.post("/api/v1/auth/login", json={"email": "admin.categorias@test.com", "password": PASSWORD}).json()["access_token"]
+
+    assert client.get("/api/v1/categorias/todas").status_code == 401
+    assert client.get("/api/v1/categorias/todas", headers=_auth(token_oferente)).status_code == 403
+
+    respuesta = client.get("/api/v1/categorias/todas", headers=_auth(token_admin))
+
+    assert respuesta.status_code == 200
+    assert [c["nombre"] for c in respuesta.json()] == ["Albañil", "Plomero"]
 
 
 # --- /auth/me: requiere_registro (CA01) --------------------------------------
@@ -135,14 +173,42 @@ def test_dni_de_9_o_10_digitos_o_cuit_mal_verificado_es_invalido(client, db_sess
         assert _codigos(respuesta) == {"dni_cuit": "dni_cuit_invalido"}, dni
 
 
-def test_dni_de_7_digitos_es_valido(client, db_session):
+def test_dni_de_7_digitos_es_invalido(client, db_session):
+    # HU-04 v2.2 (caso A18): solo se aceptan 8 dígitos (DNI) u 11 (CUIT).
     token = registrar_y_loguear(client, "dni7@test.com")
     categoria = crear_categoria_db(db_session, nombre="Carpintero")
 
-    respuesta = client.post("/api/v1/oferentes", json=formulario_registro(categoria.id_categoria, dni_cuit="1234567"), headers=_auth(token))
+    for dni in ("1234567", "1.234.567"):
+        respuesta = client.post(
+            "/api/v1/oferentes",
+            json=formulario_registro(categoria.id_categoria, dni_cuit=dni),
+            headers=_auth(token),
+        )
+        assert _codigos(respuesta) == {"dni_cuit": "dni_cuit_invalido"}, dni
+
+
+def test_dni_de_8_digitos_es_valido(client, db_session):
+    token = registrar_y_loguear(client, "dni8@test.com")
+    categoria = crear_categoria_db(db_session, nombre="Carpintero")
+
+    respuesta = client.post("/api/v1/oferentes", json=formulario_registro(categoria.id_categoria, dni_cuit="30.111.222"), headers=_auth(token))
 
     assert respuesta.status_code == 201, respuesta.text
-    assert respuesta.json()["dni_cuit"] == "1234567"
+    assert respuesta.json()["dni_cuit"] == "30111222"
+
+
+def test_cuit_del_caso_de_qa_es_valido(client, db_session):
+    token = registrar_y_loguear(client, "cuit.qa@test.com")
+    categoria = crear_categoria_db(db_session, nombre="Electricista")
+
+    respuesta = client.post(
+        "/api/v1/oferentes",
+        json=formulario_registro(categoria.id_categoria, dni_cuit="27456984830"),
+        headers=_auth(token),
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["dni_cuit"] == "27456984830"
 
 
 @pytest.mark.parametrize(

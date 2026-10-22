@@ -35,9 +35,9 @@ def cuit_valido(cuit: str) -> bool:
 
 
 def normalizar_dni_cuit(valor: str) -> str:
-    """Quita guiones y puntos; quedan 7, 8 u 11 dígitos. Se guarda solo el número."""
+    """Quita guiones y puntos; quedan 8 (DNI) u 11 (CUIT) dígitos. Se guarda solo el número."""
     limpio = valor.replace("-", "").replace(".", "")
-    if not DIGITOS_RE.fullmatch(limpio) or len(limpio) not in (7, 8, 11):
+    if not DIGITOS_RE.fullmatch(limpio) or len(limpio) not in (8, 11):
         raise PydanticCustomError("dni_cuit_invalido", "Debe ingresar un formato válido en el campo DNI/CUIT")
     if len(limpio) == 11 and not cuit_valido(limpio):
         raise PydanticCustomError("dni_cuit_invalido", "Debe ingresar un formato válido en el campo DNI/CUIT")
@@ -173,7 +173,7 @@ class OferenteRegistro(_DatosOferente):
         max_length=150,
         description="Apellido o apellidos. Opcional: en una razón social se omite.",
     )
-    dni_cuit: str = Field(description="7 u 8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales.")
+    dni_cuit: str = Field(description="8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales.")
     telefono_codigo_area: str = Field(description="Característica: de 2 a 4 dígitos, sin 0 al inicio (11, 351, 3564).")
     telefono_numero: str = Field(description="Número de línea: de 6 a 8 dígitos. Característica + número suman 10.")
     categoria_id: int = Field(description="Categoría u oficio principal, activa.")
@@ -236,6 +236,10 @@ class OferentePublicoOut(BaseModel):
     experiencia: ExperienciaRef | None = None
     telefono_codigo_area: str
     telefono_numero: str
+    whatsapp_url: str | None = Field(
+        default=None,
+        description="HU-06: link wa.me con el mensaje de contacto precargado. null si el teléfono no es válido (CA03).",
+    )
     email: str = Field(description="El mismo correo con el que el Profesional entra (D6). Es público por D7.")
     dias_atencion: list[int] = Field(default_factory=list)
     hora_inicio_atencion: str | None = None

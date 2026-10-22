@@ -60,10 +60,24 @@ def test_numero_con_cantidad_de_digitos_incorrecta_da_422(client, db_session):
     token, _ = crear_oferente(client, db_session, "gasista1@test.com", "Maria Clara", "Alessi", "20-11111111-2")
     respuesta = client.post(
         "/api/v1/oferentes/me/matriculas/validaciones",
-        json={"tipo_profesional": "Gasista", "numero_matricula": "123"},
+        json={"tipo_profesional": "Gasista", "numero_matricula": "1"},
         headers=auth(token),
     )
     assert respuesta.status_code == 422
+
+
+def test_numero_corto_multifuente_valida(client, db_session):
+    """Ecogas San Francisco usa esquemas cortos (ej. 3753): con el rango 2-10
+    pasan el formato y validan si están en el padrón con nombre coincidente."""
+    crear_fila_padron(db_session, numero="3753", nombre="JUAN PEREZ")
+    token, _ = crear_oferente(client, db_session, "gasista_corto@test.com", "Juan", "Perez", "20-22222222-3")
+    respuesta = client.post(
+        "/api/v1/oferentes/me/matriculas/validaciones",
+        json={"tipo_profesional": "Gasista", "numero_matricula": "3753"},
+        headers=auth(token),
+    )
+    assert respuesta.status_code == 200, respuesta.text
+    assert respuesta.json()["resultado"] == "Validada"
 
 
 def test_numero_con_letras_da_422(client, db_session):
@@ -535,8 +549,8 @@ def test_tipos_en_orden_alfabetico_con_sus_digitos(client, db_session):
     respuesta = client.get("/api/v1/oferentes/me/matriculas/tipos", headers=auth(token))
     assert respuesta.status_code == 200
     assert respuesta.json() == [
-        {"tipo_profesional": "Aire acondicionado", "digitos": 8},
-        {"tipo_profesional": "Gasista", "digitos": 10},
+        {"tipo_profesional": "Aire acondicionado", "digitos": 8, "digitos_min": 8},
+        {"tipo_profesional": "Gasista", "digitos": 10, "digitos_min": 2},
     ]
 
 
@@ -545,10 +559,10 @@ def test_el_422_indica_cuantos_digitos_se_esperan(client, db_session):
     url = "/api/v1/oferentes/me/matriculas/validaciones"
 
     aire = client.post(url, json={"tipo_profesional": "Aire acondicionado", "numero_matricula": "123456789"}, headers=auth(token))
-    gasista = client.post(url, json={"tipo_profesional": "Gasista", "numero_matricula": "123456789"}, headers=auth(token))
+    gasista = client.post(url, json={"tipo_profesional": "Gasista", "numero_matricula": "12345678901"}, headers=auth(token))
 
     assert aire.status_code == 422 and "Debe ingresar 8 dígitos" in aire.text
-    assert gasista.status_code == 422 and "Debe ingresar 10 dígitos" in gasista.text
+    assert gasista.status_code == 422 and "Debe ingresar entre 2 y 10 dígitos" in gasista.text
 
 
 def test_aire_acondicionado_valida_contra_su_propio_padron(client, db_session):
@@ -569,12 +583,12 @@ def test_el_422_trae_el_campo_y_el_texto_sin_prefijo_de_pydantic(client, db_sess
     token, _ = crear_oferente(client, db_session, "formato422@test.com", "Maria Clara", "Alessi", "30222227")
     url = "/api/v1/oferentes/me/matriculas/validaciones"
 
-    corto = client.post(url, json={"tipo_profesional": "Gasista", "numero_matricula": "123"}, headers=auth(token))
+    corto = client.post(url, json={"tipo_profesional": "Gasista", "numero_matricula": "1"}, headers=auth(token))
     vacio = client.post(url, json={"tipo_profesional": "Aire acondicionado", "numero_matricula": ""}, headers=auth(token))
     letras = client.post(url, json={"tipo_profesional": "Gasista", "numero_matricula": "10000A8919"}, headers=auth(token))
 
     assert corto.status_code == 422
-    assert corto.json()["detail"][0]["msg"] == "Debe ingresar 10 dígitos"
+    assert corto.json()["detail"][0]["msg"] == "Debe ingresar entre 2 y 10 dígitos"
     assert corto.json()["errores"] == [{"campo": "numero_matricula", "codigo": "digitos_invalidos"}]
     assert vacio.json()["detail"][0]["msg"] == "Debe ingresar 8 dígitos"
     assert letras.json()["errores"] == [{"campo": "numero_matricula", "codigo": "solo_digitos"}]

@@ -954,8 +954,8 @@
         "tags": [
           "Categorías"
         ],
-        "summary": "Listar categorías/oficios (público)",
-        "description": "RF5 — Navegación pública, sin login requerido.",
+        "summary": "Listar categorías/oficios activas (público)",
+        "description": "RF5 — Navegación pública, sin login requerido. Solo las activas: es la\nmisma lista que usa el alta de Profesional (caso A7 de HU-04 v2.2).",
         "operationId": "listar_categorias_api_v1_categorias_get",
         "responses": {
           "200": {
@@ -1017,6 +1017,43 @@
                 }
               }
             }
+          }
+        },
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ]
+      }
+    },
+    "/api/v1/categorias/todas": {
+      "get": {
+        "tags": [
+          "Categorías"
+        ],
+        "summary": "Listar todas las categorías, también las inactivas (solo Administrador)",
+        "description": "RF18 — Para que el Administrador vea las inactivas y pueda reactivarlas.",
+        "operationId": "listar_todas_las_categorias_api_v1_categorias_todas_get",
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "items": {
+                    "$ref": "#/components/schemas/CategoriaOut"
+                  },
+                  "type": "array",
+                  "title": "Response Listar Todas Las Categorias Api V1 Categorias Todas Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
           }
         },
         "security": [
@@ -1631,7 +1668,7 @@
           "Matrículas"
         ],
         "summary": "Tipos de profesional que se pueden fidelizar y los dígitos de su matrícula",
-        "description": "HU-02 / CA01 — Alimenta el selector \"Tipo de profesional\", en orden\nalfabético (la primera opción es la que viene por defecto), y el label\n\"Debe ingresar X dígitos\" del número de matrícula.",
+        "description": "HU-02 / CA01 — Alimenta el selector \"Tipo de profesional\", en orden\nalfabético (la primera opción es la que viene por defecto), y el label\nde dígitos del número de matrícula (`digitos_min`-`digitos`).",
         "operationId": "listar_tipos_api_v1_oferentes_me_matriculas_tipos_get",
         "responses": {
           "200": {
@@ -3235,6 +3272,18 @@
             "type": "string",
             "title": "Telefono Numero"
           },
+          "whatsapp_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Url",
+            "description": "HU-06: link wa.me con el mensaje de contacto precargado. null si el teléfono no es válido (CA03)."
+          },
           "email": {
             "type": "string",
             "title": "Email",
@@ -3480,6 +3529,18 @@
           "telefono_numero": {
             "type": "string",
             "title": "Telefono Numero"
+          },
+          "whatsapp_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Whatsapp Url",
+            "description": "HU-06: link wa.me con el mensaje de contacto precargado. null si el teléfono no es válido (CA03)."
           },
           "email": {
             "type": "string",
@@ -3740,7 +3801,7 @@
           "dni_cuit": {
             "type": "string",
             "title": "Dni Cuit",
-            "description": "7 u 8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales."
+            "description": "8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales."
           }
         },
         "additionalProperties": false,
@@ -4612,6 +4673,11 @@
           "digitos": {
             "type": "integer",
             "title": "Digitos"
+          },
+          "digitos_min": {
+            "type": "integer",
+            "title": "Digitos Min",
+            "default": 2
           }
         },
         "type": "object",
@@ -4620,7 +4686,7 @@
           "digitos"
         ],
         "title": "TipoMatriculaOut",
-        "description": "Una opción del selector \"Tipo de profesional\", con la cantidad de\ndígitos que exige su número de matrícula."
+        "description": "Una opción del selector \"Tipo de profesional\", con el rango de\ndígitos que acepta su número de matrícula (multifuente). `digitos` se\nmantiene como máximo por compatibilidad."
       },
       "Token": {
         "properties": {
@@ -4888,7 +4954,7 @@
           "numero_matricula": {
             "type": "string",
             "title": "Numero Matricula",
-            "description": "Solo dígitos. 10 para Gasista, 8 para Aire acondicionado."
+            "description": "Solo dígitos. Gasista 2-10 (10 local, cortas Ecogas/GasNea), Aire 8 exactos."
           }
         },
         "type": "object",
@@ -4897,7 +4963,7 @@
           "numero_matricula"
         ],
         "title": "ValidacionMatriculaIn",
-        "description": "Datos del bloque de fidelización del perfil: el botón Confirmar se\nhabilita recién con los dos campos completos y la cantidad de dígitos\ncorrecta para el tipo elegido.",
+        "description": "Datos del bloque de fidelización del perfil: el botón Confirmar se\nhabilita recién con los dos campos completos y la cantidad de dígitos\ndentro del rango de cada tipo (Gasista 2-10 multifuente, Aire 8 exactos).",
         "example": {
           "numero_matricula": "1000008919",
           "tipo_profesional": "Gasista"

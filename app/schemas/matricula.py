@@ -9,16 +9,16 @@ TipoProfesionalLiteral = Literal["Gasista", "Aire acondicionado"]
 class ValidacionMatriculaIn(BaseModel):
     """Datos del bloque de fidelización del perfil: el botón Confirmar se
     habilita recién con los dos campos completos y la cantidad de dígitos
-    correcta para el tipo elegido."""
+    dentro del rango de cada tipo (Gasista 2-10 multifuente, Aire 8 exactos)."""
 
     model_config = ConfigDict(json_schema_extra={"example": {"tipo_profesional": "Gasista", "numero_matricula": "1000008919"}})
 
     tipo_profesional: TipoProfesionalLiteral
-    numero_matricula: str = Field(description="Solo dígitos. 10 para Gasista, 8 para Aire acondicionado.")
+    numero_matricula: str = Field(description="Solo dígitos. Gasista 2-10 (10 local, cortas Ecogas/GasNea), Aire 8 exactos.")
 
     @model_validator(mode="after")
     def normalizar_numero(self):
-        # El formato (solo dígitos y cantidad por tipo) lo valida el router con
+        # El formato (solo dígitos y rango por tipo) lo valida el router con
         # `error_validacion`, para que el 422 traiga el campo y el texto del CA01
         # sin el prefijo "Value error," de Pydantic.
         self.numero_matricula = self.numero_matricula.strip()
@@ -26,11 +26,13 @@ class ValidacionMatriculaIn(BaseModel):
 
 
 class TipoMatriculaOut(BaseModel):
-    """Una opción del selector "Tipo de profesional", con la cantidad de
-    dígitos que exige su número de matrícula."""
+    """Una opción del selector "Tipo de profesional", con el rango de
+    dígitos que acepta su número de matrícula (multifuente). `digitos` se
+    mantiene como máximo por compatibilidad."""
 
     tipo_profesional: str
     digitos: int
+    digitos_min: int = 2
 
 
 class MatriculaOut(BaseModel):

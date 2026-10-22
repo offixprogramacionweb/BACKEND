@@ -1,0 +1,58 @@
+# Sync mensual de padrones sin intervención manual (HU actualización BD matrículas).
+#
+# - Programado: día 1 de cada mes, 03:00 UTC (00:00 ART).
+# - Manual: pestaña Actions > Sync padrones > Run workflow (elegís dry-run o real).
+# - Carga por REST (service_role): no necesita database password ni toca Vercel.
+# - Corre scrapers web (GasNea, CAMTREC, Ecogas SF con Playwright) + archivos
+#   versionados, con upsert idempotente.
+#
+# Requisito (una sola vez): repo > Settings > Secrets and variables > Actions >
+# New repository secret (dos secrets):
+#   SUPABASE_URL = https://<ref>.supabase.co
+#   SUPABASE_SERVICE_ROLE = <jwt service_role>
+# Y en Supabase: schema `offix` expuesto en Data API con grants de escritura.
+
+name: Sync padrones de matrículas
+
+on:
+  schedule:
+    - cron: "0 3 1 * *"
+  workflow_dispatch:
+    inputs:
+      escribir:
+        description: "Escribir en la BD (false = solo reporte dry-run)"
+        required: false
+        default: "false"
+        type: choice
+        options: ["false", "true"]
+
+jobs:
+  sync:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: |
+          pip install -r requirements.txt
+          pip install playwright
+          python -m playwright install --with-deps chromium
+
+      - name: Sync (dry-run de control)
+        if: github.event_name == 'workflow_dispatch' && inputs.escribir == 'false'
+        run: python -m app.scripts.cargar_padron_rest --fuente todas --incluir-ecogas --paginas 2 --dry-run
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}
+
+      - name: Sync (escritura mensual)
+        if: github.event_name == 'schedule' || inputs.escribir == 'true'
+        run: python -m app.scripts.cargar_padron_rest --fuente todas --incluir-ecogas --paginas 2 --confirm
+        env:
+          SUPABASE_URL: ${{ secrets.SUPABASE_URL }}
+          SUPABASE_SERVICE_ROLE: ${{ secrets.SUPABASE_SERVICE_ROLE }}

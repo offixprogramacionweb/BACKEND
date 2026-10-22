@@ -14,7 +14,7 @@ from app.schemas.matricula import (
     ValidacionMatriculaIn,
     ValidacionMatriculaOut,
 )
-from app.services.matriculas import DIGITOS_POR_TIPO, MENSAJES_RESULTADO, validar_matricula
+from app.services.matriculas import MENSAJES_RESULTADO, RANGO_DIGITOS_POR_TIPO, validar_matricula
 
 router = APIRouter(prefix="/api/v1/oferentes/me/matriculas", tags=["Matrículas"])
 
@@ -65,12 +65,16 @@ def crear_validacion(
     para Aire acondicionado— simula un padrón que no responde, así que la
     respuesta `Timeout` llega recién al cumplirse ese tiempo.
     """
-    esperados = DIGITOS_POR_TIPO[payload.tipo_profesional]
+    minimo, maximo = RANGO_DIGITOS_POR_TIPO[payload.tipo_profesional]
     numero = payload.numero_matricula
     if numero and not numero.isdigit():
         raise error_validacion("numero_matricula", "solo_digitos", "El número de matrícula solo puede tener dígitos")
-    if len(numero) != esperados:
-        raise error_validacion("numero_matricula", "digitos_invalidos", f"Debe ingresar {esperados} dígitos")
+    if not (minimo <= len(numero) <= maximo):
+        if minimo == maximo:
+            raise error_validacion("numero_matricula", "digitos_invalidos", f"Debe ingresar {maximo} dígitos")
+        raise error_validacion(
+            "numero_matricula", "digitos_invalidos", f"Debe ingresar entre {minimo} y {maximo} dígitos"
+        )
 
     oferente = _oferente_actual(db, usuario)
     validacion = validar_matricula(db, oferente, payload.tipo_profesional, payload.numero_matricula)
@@ -89,8 +93,11 @@ def crear_validacion(
 def listar_tipos(usuario: Usuario = Depends(get_current_user)):
     """HU-02 / CA01 — Alimenta el selector "Tipo de profesional", en orden
     alfabético (la primera opción es la que viene por defecto), y el label
-    "Debe ingresar X dígitos" del número de matrícula."""
-    return [TipoMatriculaOut(tipo_profesional=tipo, digitos=digitos) for tipo, digitos in sorted(DIGITOS_POR_TIPO.items())]
+    de dígitos del número de matrícula (`digitos_min`-`digitos`)."""
+    return [
+        TipoMatriculaOut(tipo_profesional=tipo, digitos=maximo, digitos_min=minimo)
+        for tipo, (minimo, maximo) in sorted(RANGO_DIGITOS_POR_TIPO.items())
+    ]
 
 
 @router.get(

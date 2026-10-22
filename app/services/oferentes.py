@@ -28,7 +28,7 @@ from app.schemas.oferente import (
     OferenteRegistro,
     OferentesPaginadosOut,
 )
-from app.services.mensajes import telefono_partes_son_validas
+from app.services.mensajes import armar_whatsapp_contacto, telefono_partes_son_validas
 from app.services.storage import url_publica
 
 # Campos que la edición no puede dejar en NULL: el registro los exige.
@@ -82,6 +82,7 @@ def armar_publica(db: Session, oferente: Oferente) -> OferentePublicoOut:
         ),
         telefono_codigo_area=oferente.telefono_codigo_area,
         telefono_numero=oferente.telefono_numero,
+        whatsapp_url=armar_whatsapp_contacto(oferente.telefono_completo, oferente.nombre_completo, categoria.nombre if categoria else None),
         email=oferente.usuario.email,
         dias_atencion=[dia.dia for dia in oferente.dias_atencion],
         hora_inicio_atencion=_hora(oferente.hora_inicio_atencion),

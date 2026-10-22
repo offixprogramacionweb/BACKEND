@@ -4,6 +4,7 @@ import pytest
 
 from app.core.config import settings
 from app.services.mensajes import (
+    armar_whatsapp_contacto,
     armar_whatsapp_url,
     normalizar_telefono,
     telefono_es_valido,
@@ -72,3 +73,36 @@ def test_whatsapp_url_url_encodea_el_texto():
     # Viaja url-encodeado: ni saltos de línea ni espacios crudos en la URL.
     assert " " not in url and "\n" not in url
     assert unquote(url.split("?text=", 1)[1]) == texto_invitacion("María Gómez", "https://offix.test/resena/ABC")
+
+
+# --- HU-06: contacto por WhatsApp desde el perfil (CA01-CA03) ----------------
+
+
+def test_contacto_arma_el_mensaje_de_qa_con_nombre_y_oficio():
+    url = armar_whatsapp_contacto("351-6924551", "María Gómez", "Electricista")
+
+    assert url.startswith("https://wa.me/5493516924551?text=")
+    assert " " not in url
+    assert unquote(url.split("?text=", 1)[1]) == (
+        "Hola María Gómez, vi tu perfil de Electricista en OFFIX y necesito un presupuesto. ¿Estás disponible?"
+    )
+
+
+def test_contacto_sin_oficio_usa_la_plantilla_sin_oficio():
+    url = armar_whatsapp_contacto("3516924551", "María Gómez", None)
+
+    assert unquote(url.split("?text=", 1)[1]) == (
+        "Hola María Gómez, vi tu perfil en OFFIX y necesito un presupuesto. ¿Estás disponible?"
+    )
+
+
+@pytest.mark.parametrize("telefono", [None, "", "0351-440088", "0351-4400888", "+543516924551", "351-69245", "35a4-692455"])
+def test_contacto_sin_telefono_valido_no_arma_link(telefono):
+    """CA03: sin número válido no hay link, y el frontend no abre WhatsApp."""
+    assert armar_whatsapp_contacto(telefono, "María Gómez", "Electricista") is None
+
+
+def test_telefono_con_0_inicial_de_10_digitos_es_invalido():
+    # El validador de HU-04 ya rechazaba 0 + 10 dígitos por el largo; con 10 dígitos
+    # totales hay que rechazarlo por el 0 inicial (la regla "Sin 0, 15 o +54").
+    assert not telefono_es_valido("0351-440088")

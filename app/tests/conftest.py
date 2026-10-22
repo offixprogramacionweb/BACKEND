@@ -120,12 +120,14 @@ def crear_admin_db(db_session, email: str = "admin@test.com") -> Usuario:
     return admin
 
 
-def formulario_registro(categoria_id: int, dni_cuit: str = "20-11111111-2", nombre: str = "Oferente Prueba", **extra) -> dict:
+def formulario_registro(categoria_id: int, dni_cuit: str = "20-11111111-2", nombre: str = "Oferente", **extra) -> dict:
     """Body válido de POST /api/v1/oferentes. `extra` pisa campos puntuales."""
     cuerpo = {
         "nombre": nombre,
+        "apellido": "Prueba",
         "dni_cuit": dni_cuit,
-        "telefono": "3564-400000",
+        "telefono_codigo_area": "3564",
+        "telefono_numero": "400000",
         "categoria_id": categoria_id,
         "dias_atencion": [1, 2, 3, 4, 5],
         "hora_inicio_atencion": "08:00",

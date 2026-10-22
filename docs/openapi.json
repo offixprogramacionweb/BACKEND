@@ -301,8 +301,8 @@
         "tags": [
           "Oferentes"
         ],
-        "summary": "Buscar profesionales (público)",
-        "description": "RF7/RF8 — Búsqueda pública. Excluye las cuentas suspendidas o bloqueadas\n(observación F4 de QA): un Profesional suspendido no aparece.",
+        "summary": "Buscar profesionales (público, paginado)",
+        "description": "RF7/RF8 — Búsqueda pública paginada. Excluye las cuentas suspendidas o\nbloqueadas (observación F4 de QA): un Profesional suspendido no aparece.\nUna página fuera de rango devuelve `items` vacío con el `total` real.",
         "operationId": "buscar_oferentes_api_v1_oferentes_get",
         "parameters": [
           {
@@ -318,10 +318,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Palabra clave: parte del nombre",
+              "description": "Palabra clave: parte del nombre o del apellido",
               "title": "Q"
             },
-            "description": "Palabra clave: parte del nombre"
+            "description": "Palabra clave: parte del nombre o del apellido"
           },
           {
             "name": "categoria_id",
@@ -340,6 +340,31 @@
               "title": "Categoria Id"
             },
             "description": "Filtrar por categoría/oficio"
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "description": "Página a devolver, desde 1.",
+              "default": 1,
+              "title": "Pagina"
+            },
+            "description": "Página a devolver, desde 1."
+          },
+          {
+            "name": "por_pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "Profesionales por página: 10 o 25.",
+              "default": 10,
+              "title": "Por Pagina"
+            },
+            "description": "Profesionales por página: 10 o 25."
           }
         ],
         "responses": {
@@ -348,24 +373,13 @@
             "content": {
               "application/json": {
                 "schema": {
-                  "type": "array",
-                  "items": {
-                    "$ref": "#/components/schemas/OferentePublicoOut"
-                  },
-                  "title": "Response Buscar Oferentes Api V1 Oferentes Get"
+                  "$ref": "#/components/schemas/OferentesPaginadosOut"
                 }
               }
             }
           },
           "422": {
-            "description": "Validation Error",
-            "content": {
-              "application/json": {
-                "schema": {
-                  "$ref": "#/components/schemas/HTTPValidationError"
-                }
-              }
-            }
+            "description": "`por_pagina` distinto de 10 o 25, o `pagina` menor a 1"
           }
         }
       },
@@ -2947,7 +2961,20 @@
             ],
             "title": "Nombre"
           },
-          "telefono": {
+          "apellido": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido"
+          },
+          "telefono_codigo_area": {
             "anyOf": [
               {
                 "type": "string"
@@ -2956,7 +2983,18 @@
                 "type": "null"
               }
             ],
-            "title": "Telefono"
+            "title": "Telefono Codigo Area"
+          },
+          "telefono_numero": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono Numero"
           },
           "categoria_id": {
             "anyOf": [
@@ -3122,6 +3160,18 @@
             "type": "string",
             "title": "Nombre"
           },
+          "apellido": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido",
+            "description": "Null solo en perfiles anteriores a la separación de nombre y apellido."
+          },
           "categoria_id": {
             "anyOf": [
               {
@@ -3164,9 +3214,13 @@
               }
             ]
           },
-          "telefono": {
+          "telefono_codigo_area": {
             "type": "string",
-            "title": "Telefono"
+            "title": "Telefono Codigo Area"
+          },
+          "telefono_numero": {
+            "type": "string",
+            "title": "Telefono Numero"
           },
           "email": {
             "type": "string",
@@ -3328,7 +3382,8 @@
         "required": [
           "id_oferente",
           "nombre",
-          "telefono",
+          "telefono_codigo_area",
+          "telefono_numero",
           "email",
           "disponible_emergencia",
           "promedio_calificacion",
@@ -3350,6 +3405,18 @@
           "nombre": {
             "type": "string",
             "title": "Nombre"
+          },
+          "apellido": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido",
+            "description": "Null solo en perfiles anteriores a la separación de nombre y apellido."
           },
           "categoria_id": {
             "anyOf": [
@@ -3393,9 +3460,13 @@
               }
             ]
           },
-          "telefono": {
+          "telefono_codigo_area": {
             "type": "string",
-            "title": "Telefono"
+            "title": "Telefono Codigo Area"
+          },
+          "telefono_numero": {
+            "type": "string",
+            "title": "Telefono Numero"
           },
           "email": {
             "type": "string",
@@ -3544,7 +3615,8 @@
         "required": [
           "id_oferente",
           "nombre",
-          "telefono",
+          "telefono_codigo_area",
+          "telefono_numero",
           "email",
           "disponible_emergencia",
           "promedio_calificacion",
@@ -3561,12 +3633,24 @@
             "maxLength": 150,
             "minLength": 2,
             "title": "Nombre",
-            "description": "Nombre y apellido, o razón social. Un solo campo."
+            "description": "Nombre o nombres. Para una razón social, va acá."
           },
-          "telefono": {
+          "apellido": {
             "type": "string",
-            "title": "Telefono",
-            "description": "10 dígitos con guion opcional. Sin 0, 15 ni +54."
+            "maxLength": 150,
+            "minLength": 2,
+            "title": "Apellido",
+            "description": "Apellido o apellidos."
+          },
+          "telefono_codigo_area": {
+            "type": "string",
+            "title": "Telefono Codigo Area",
+            "description": "Característica: 3 o 4 dígitos, sin 0 al inicio."
+          },
+          "telefono_numero": {
+            "type": "string",
+            "title": "Telefono Numero",
+            "description": "Número de línea: 6 o 7 dígitos. Entre característica y número, 10 dígitos."
           },
           "categoria_id": {
             "type": "integer",
@@ -3643,7 +3727,9 @@
         "type": "object",
         "required": [
           "nombre",
-          "telefono",
+          "apellido",
+          "telefono_codigo_area",
+          "telefono_numero",
           "categoria_id",
           "dias_atencion",
           "hora_inicio_atencion",
@@ -3653,6 +3739,7 @@
         "title": "OferenteRegistro",
         "description": "Body de `POST /api/v1/oferentes` (HU-04, CA02 y CA03).",
         "example": {
+          "apellido": "Ludueña",
           "categoria_id": 1,
           "dias_atencion": [
             1,
@@ -3668,9 +3755,51 @@
           "hora_fin_atencion": "18:00",
           "hora_inicio_atencion": "08:00",
           "info_guardia": "Atiendo urgencias de lunes a sábado hasta las 22 h.",
-          "nombre": "Serena Ludueña",
-          "telefono": "3564-400111"
+          "nombre": "Serena",
+          "telefono_codigo_area": "3564",
+          "telefono_numero": "400111"
         }
+      },
+      "OferentesPaginadosOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OferentePublicoOut"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina",
+            "description": "Página devuelta, desde 1."
+          },
+          "por_pagina": {
+            "type": "integer",
+            "title": "Por Pagina",
+            "description": "Tamaño de página pedido: 10 o 25."
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad de profesionales que cumplen el filtro, en todas las páginas."
+          },
+          "total_paginas": {
+            "type": "integer",
+            "title": "Total Paginas",
+            "description": "0 si no hay resultados."
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "pagina",
+          "por_pagina",
+          "total",
+          "total_paginas"
+        ],
+        "title": "OferentesPaginadosOut",
+        "description": "Respuesta de `GET /oferentes`: una página de perfiles públicos y lo que\nhace falta para armar el paginador."
       },
       "PerfilOut": {
         "properties": {

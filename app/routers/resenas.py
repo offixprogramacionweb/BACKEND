@@ -55,7 +55,7 @@ def _esta_vencida(solicitud: SolicitudResena) -> bool:
 
 
 def _nombre_completo(oferente: Oferente) -> str:
-    return oferente.nombre
+    return oferente.nombre_completo
 
 
 def _nombre_publico(nombre: str) -> str:
@@ -132,7 +132,7 @@ def _validar_no_auto_resena(oferente: Oferente, payload: SolicitudResenaCreate) 
     es infalible (puede usar otra casilla), pero cierra el caso trivial."""
     if payload.email_cliente and oferente.usuario and payload.email_cliente.lower() == oferente.usuario.email.lower():
         raise error_validacion("email_cliente", "contacto_propio", "No podés generar un enlace de reseña para vos mismo")
-    if payload.telefono_cliente and normalizar_telefono(payload.telefono_cliente) == oferente.telefono:
+    if payload.telefono_cliente and normalizar_telefono(payload.telefono_cliente) == oferente.telefono_completo:
         raise error_validacion("telefono_cliente", "contacto_propio", "No podés generar un enlace de reseña para vos mismo")
 
 

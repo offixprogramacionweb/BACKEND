@@ -2,14 +2,17 @@ from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
 from app.core.deps import get_current_user, get_oferente_registrado
-from app.core.errores import error_negocio
+from app.core.errores import error_negocio, error_validacion
 from app.db.database import get_db
 from app.models.oferente import Oferente
-from app.models.usuario import EstadoCuenta, Usuario
-from app.schemas.oferente import OferenteEdicion, OferentePrivadoOut, OferentePublicoOut, OferenteRegistro
-from app.services.oferentes import aplicar_edicion, armar_privada, armar_publica, crear_oferente
+from app.models.usuario import Usuario
+from app.schemas.oferente import OferenteEdicion, OferentePrivadoOut, OferentePublicoOut, OferenteRegistro, OferentesPaginadosOut
+from app.services.oferentes import aplicar_edicion, armar_privada, armar_publica, buscar_publicos, crear_oferente
 
 router = APIRouter(prefix="/api/v1/oferentes", tags=["Oferentes"])
+
+# Tamaños de página del listado público. Cualquier otro valor responde 422.
+POR_PAGINA_PERMITIDOS = (10, 25)
 
 RESPUESTAS_REGISTRO = {
     401: {"description": "Falta token o es inválido"},
@@ -19,25 +22,23 @@ RESPUESTAS_REGISTRO = {
 
 @router.get(
     "",
-    response_model=list[OferentePublicoOut],
-    summary="Buscar profesionales (público)",
+    response_model=OferentesPaginadosOut,
+    summary="Buscar profesionales (público, paginado)",
+    responses={422: {"description": "`por_pagina` distinto de 10 o 25, o `pagina` menor a 1"}},
 )
 def buscar_oferentes(
-    q: str | None = Query(default=None, description="Palabra clave: parte del nombre"),
+    q: str | None = Query(default=None, description="Palabra clave: parte del nombre o del apellido"),
     categoria_id: int | None = Query(default=None, description="Filtrar por categoría/oficio"),
+    pagina: int = Query(default=1, ge=1, description="Página a devolver, desde 1."),
+    por_pagina: int = Query(default=10, description="Profesionales por página: 10 o 25."),
     db: Session = Depends(get_db),
 ):
-    """RF7/RF8 — Búsqueda pública. Excluye las cuentas suspendidas o bloqueadas
-    (observación F4 de QA): un Profesional suspendido no aparece."""
-    query = db.query(Oferente).join(Usuario, Usuario.id_usuario == Oferente.id_oferente).filter(
-        Usuario.estado_cuenta == EstadoCuenta.ACTIVA
-    )
-    if categoria_id:
-        query = query.filter(Oferente.categoria_id == categoria_id)
-    if q:
-        like = f"%{q}%"
-        query = query.filter(Oferente.nombre.ilike(like))
-    return [armar_publica(db, oferente) for oferente in query.all()]
+    """RF7/RF8 — Búsqueda pública paginada. Excluye las cuentas suspendidas o
+    bloqueadas (observación F4 de QA): un Profesional suspendido no aparece.
+    Una página fuera de rango devuelve `items` vacío con el `total` real."""
+    if por_pagina not in POR_PAGINA_PERMITIDOS:
+        raise error_validacion("por_pagina", "invalido", "Elegí 10 o 25 profesionales por página")
+    return buscar_publicos(db, q=q, categoria_id=categoria_id, pagina=pagina, por_pagina=por_pagina)
 
 
 @router.post(

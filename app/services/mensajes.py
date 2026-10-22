@@ -22,6 +22,24 @@ Calificá tu experiencia acá: {link_resena}
 Solo te va a tomar un minuto. ¡Gracias por ser parte de Offix!"""
 
 
+# Teléfono partido (HU-04): característica de 3 o 4 dígitos sin 0 inicial, y
+# número de 6 o 7 dígitos. Entre los dos tienen que sumar 10.
+CODIGO_AREA_RE = re.compile(r"[1-9]\d{2,3}")
+NUMERO_LINEA_RE = re.compile(r"\d{6,7}")
+
+
+def codigo_area_es_valido(codigo: str) -> bool:
+    return CODIGO_AREA_RE.fullmatch(codigo) is not None
+
+
+def numero_linea_es_valido(numero: str) -> bool:
+    return NUMERO_LINEA_RE.fullmatch(numero) is not None
+
+
+def telefono_partes_son_validas(codigo: str, numero: str) -> bool:
+    return codigo_area_es_valido(codigo) and numero_linea_es_valido(numero) and len(codigo) + len(numero) == 10
+
+
 def telefono_es_valido(telefono: str) -> bool:
     if not TELEFONO_RE.match(telefono):
         return False

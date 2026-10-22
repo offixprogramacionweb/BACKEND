@@ -33,7 +33,7 @@ def _armar_salida(db: Session, notificacion: Notificacion) -> NotificacionOut:
         validacion = db.get(ValidacionMatricula, notificacion.validacion_matricula_id)
         if validacion:
             oferente = db.get(Oferente, validacion.oferente_id)
-            oferente_nombre = oferente.nombre if oferente else None
+            oferente_nombre = oferente.nombre_completo if oferente else None
             tipo_profesional = validacion.tipo_profesional
             numero_solicitada = validacion.numero_matricula
             matricula_vigente = (

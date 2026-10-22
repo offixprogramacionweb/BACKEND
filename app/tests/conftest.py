@@ -95,6 +95,19 @@ def client(db_session, emails, auth0, monkeypatch):
         app.dependency_overrides.clear()
 
 
+def telefono_cliente_partido(telefono: str) -> dict:
+    """Parte un teléfono de prueba "característica-número" en los campos que espera la API.
+    Un texto sin guion va entero en la característica (y así queda como dato inválido)."""
+    codigo, _, numero = telefono.partition("-")
+    return {"telefono_cliente_codigo_area": codigo, "telefono_cliente_numero": numero or None}
+
+
+def telefono_cliente_de(datos: dict) -> str | None:
+    """Une característica y número de una respuesta, para comparar con el teléfono completo."""
+    codigo, numero = datos.get("telefono_cliente_codigo_area"), datos.get("telefono_cliente_numero")
+    return f"{codigo}{numero}" if codigo and numero else None
+
+
 PASSWORD = "Test1234!"
 
 
@@ -120,12 +133,14 @@ def crear_admin_db(db_session, email: str = "admin@test.com") -> Usuario:
     return admin
 
 
-def formulario_registro(categoria_id: int, dni_cuit: str = "20-11111111-2", nombre: str = "Oferente Prueba", **extra) -> dict:
+def formulario_registro(categoria_id: int, dni_cuit: str = "20-11111111-2", nombre: str = "Oferente", **extra) -> dict:
     """Body válido de POST /api/v1/oferentes. `extra` pisa campos puntuales."""
     cuerpo = {
         "nombre": nombre,
+        "apellido": "Prueba",
         "dni_cuit": dni_cuit,
-        "telefono": "3564-400000",
+        "telefono_codigo_area": "3564",
+        "telefono_numero": "400000",
         "categoria_id": categoria_id,
         "dias_atencion": [1, 2, 3, 4, 5],
         "hora_inicio_atencion": "08:00",

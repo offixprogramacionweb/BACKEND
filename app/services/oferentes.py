@@ -5,7 +5,7 @@ comparten casi todo, y la regla de "qué ve cada uno" (D7) tiene que estar en un
 único lugar.
 """
 
-from sqlalchemy import func
+from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
 
@@ -17,7 +17,7 @@ from app.models.oferente import EstadoVerificacion, Oferente
 from app.models.oferente_dia_atencion import OferenteDiaAtencion
 from app.models.resena import EstadoResena, Resena
 from app.models.trabajo_realizado import TrabajoRealizado
-from app.models.usuario import RolUsuario, Usuario
+from app.models.usuario import EstadoCuenta, RolUsuario, Usuario
 from app.schemas.oferente import (
     CategoriaRef,
     ExperienciaRef,
@@ -26,14 +26,16 @@ from app.schemas.oferente import (
     OferentePrivadoOut,
     OferentePublicoOut,
     OferenteRegistro,
+    OferentesPaginadosOut,
 )
-from app.services.mensajes import armar_whatsapp_contacto
+from app.services.mensajes import armar_whatsapp_contacto, telefono_partes_son_validas
 from app.services.storage import url_publica
 
 # Campos que la edición no puede dejar en NULL: el registro los exige.
 CAMPOS_NO_NULOS = {
     "nombre",
-    "telefono",
+    "telefono_codigo_area",
+    "telefono_numero",
     "categoria_id",
     "dias_atencion",
     "hora_inicio_atencion",
@@ -69,6 +71,7 @@ def armar_publica(db: Session, oferente: Oferente) -> OferentePublicoOut:
     return OferentePublicoOut(
         id_oferente=oferente.id_oferente,
         nombre=oferente.nombre,
+        apellido=oferente.apellido,
         categoria_id=oferente.categoria_id,
         categoria=CategoriaRef(id_categoria=categoria.id_categoria, nombre=categoria.nombre) if categoria else None,
         especialidad=oferente.especialidad,
@@ -77,8 +80,9 @@ def armar_publica(db: Session, oferente: Oferente) -> OferentePublicoOut:
             if oferente.experiencia
             else None
         ),
-        telefono=oferente.telefono,
-        whatsapp_url=armar_whatsapp_contacto(oferente.telefono, oferente.nombre, categoria.nombre if categoria else None),
+        telefono_codigo_area=oferente.telefono_codigo_area,
+        telefono_numero=oferente.telefono_numero,
+        whatsapp_url=armar_whatsapp_contacto(oferente.telefono_completo, oferente.nombre_completo, categoria.nombre if categoria else None),
         email=oferente.usuario.email,
         dias_atencion=[dia.dia for dia in oferente.dias_atencion],
         hora_inicio_atencion=_hora(oferente.hora_inicio_atencion),
@@ -139,8 +143,10 @@ def crear_oferente(db: Session, usuario: Usuario, datos: OferenteRegistro) -> Of
     oferente = Oferente(
         id_oferente=usuario.id_usuario,
         nombre=datos.nombre,
+        apellido=datos.apellido,
         dni_cuit=datos.dni_cuit,
-        telefono=datos.telefono,
+        telefono_codigo_area=datos.telefono_codigo_area,
+        telefono_numero=datos.telefono_numero,
         categoria_id=datos.categoria_id,
         especialidad=datos.especialidad,
         experiencia=datos.experiencia,
@@ -172,17 +178,24 @@ def aplicar_edicion(db: Session, oferente: Oferente, datos: OferenteEdicion) -> 
         if campo in cambios and cambios[campo] is None:
             raise error_validacion(campo, "requerido", "Complete este campo")
 
-    if "nombre" in cambios:
-        cambio_identidad = cambios["nombre"] != oferente.nombre
-        # Si ya hay una matrícula fidelizada, la identidad queda atada al
-        # distintivo de verificado: cambiarla dejaría el distintivo colgado de
-        # otra persona (HU-04, D18).
-        if cambio_identidad and oferente.matriculas:
-            raise error_negocio(
-                409,
-                "nombre_bloqueado_por_matricula",
-                "No podés cambiar el nombre mientras tengas una matrícula fidelizada",
-            )
+    # Si ya hay una matrícula fidelizada, la identidad (nombre y apellido)
+    # queda atada al distintivo de verificado: cambiarla dejaría el distintivo
+    # colgado de otra persona (HU-04, D18).
+    cambio_identidad = any(campo in cambios and cambios[campo] != getattr(oferente, campo) for campo in ("nombre", "apellido"))
+    if cambio_identidad and oferente.matriculas:
+        raise error_negocio(
+            409,
+            "nombre_bloqueado_por_matricula",
+            "No podés cambiar el nombre ni el apellido mientras tengas una matrícula fidelizada",
+        )
+
+    if {"telefono_codigo_area", "telefono_numero"} & cambios.keys():
+        # Cada parte ya pasó su propio formato en el schema; acá se valida el
+        # par, combinando lo nuevo con lo que ya estaba guardado.
+        codigo = cambios.get("telefono_codigo_area", oferente.telefono_codigo_area)
+        numero = cambios.get("telefono_numero", oferente.telefono_numero)
+        if not telefono_partes_son_validas(codigo, numero):
+            raise error_validacion("telefono_numero", "telefono_invalido", "Código de área y número tienen que sumar 10 dígitos")
 
     if "categoria_id" in cambios:
         validar_categoria(db, cambios["categoria_id"])
@@ -203,3 +216,29 @@ def aplicar_edicion(db: Session, oferente: Oferente, datos: OferenteEdicion) -> 
     db.commit()
     db.refresh(oferente)
     return oferente
+
+
+def buscar_publicos(db: Session, *, q: str | None, categoria_id: int | None, pagina: int, por_pagina: int) -> OferentesPaginadosOut:
+    """RF7/RF8 — Búsqueda pública paginada. Excluye las cuentas suspendidas o
+    bloqueadas (observación F4 de QA): un Profesional suspendido no aparece.
+
+    El orden es por `id_oferente` para que una página no se mezcle con la
+    siguiente. Solo se arman los perfiles de la página pedida."""
+    query = db.query(Oferente).join(Usuario, Usuario.id_usuario == Oferente.id_oferente).filter(
+        Usuario.estado_cuenta == EstadoCuenta.ACTIVA
+    )
+    if categoria_id:
+        query = query.filter(Oferente.categoria_id == categoria_id)
+    if q:
+        like = f"%{q}%"
+        query = query.filter(or_(Oferente.nombre.ilike(like), Oferente.apellido.ilike(like)))
+
+    total = query.count()
+    perfiles = query.order_by(Oferente.id_oferente).offset((pagina - 1) * por_pagina).limit(por_pagina).all()
+    return OferentesPaginadosOut(
+        items=[armar_publica(db, oferente) for oferente in perfiles],
+        pagina=pagina,
+        por_pagina=por_pagina,
+        total=total,
+        total_paginas=-(-total // por_pagina),
+    )

@@ -3,6 +3,8 @@ email/password: ninguno de los dos toca al otro."""
 
 from urllib.parse import parse_qs, urlparse
 
+import pytest
+
 from app.core.config import settings
 from app.models.usuario import EstadoCuenta, RolUsuario, Usuario
 from app.services.auth0 import Auth0ServiceFakeFalla, PerfilGoogle, get_auth0_service
@@ -72,6 +74,7 @@ def test_callback_exitoso_redirige_a_la_vista_de_perfil_con_token(client, db_ses
         "id_usuario": perfil.json()["id_usuario"],
         "email": "cliente.google@test.com",
         "nombre": "Cliente Google",
+        "apellido": None,
         "rol": "Oferente",
         "requiere_registro": True,
         "fidelizado": False,
@@ -217,3 +220,45 @@ def test_me_de_un_usuario_de_password_no_tiene_nombre(client):
     perfil = client.get("/api/v1/auth/me", headers={"Authorization": f"Bearer {token}"}).json()
     assert perfil["email"] == "solopass@test.com"
     assert perfil["nombre"] is None
+
+
+class _RespuestaUserinfo:
+    status_code = 200
+
+    def __init__(self, datos):
+        self._datos = datos
+
+    def json(self):
+        return self._datos
+
+
+@pytest.mark.parametrize(
+    ("datos", "esperado"),
+    [
+        # Google manda nombre y apellido por separado: se guardan separados.
+        ({"email": "a@test.com", "email_verified": True, "name": "Juan Pérez", "given_name": "Juan", "family_name": "Pérez"}, ("Juan", "Pérez")),
+        # Solo el nombre completo: queda tal cual, sin apellido.
+        ({"email": "a@test.com", "email_verified": True, "name": "Juan Pérez"}, ("Juan Pérez", None)),
+        # Falta el apellido: no se arma nada a partir del nombre completo.
+        ({"email": "a@test.com", "email_verified": True, "name": "Juan Pérez", "given_name": "Juan"}, ("Juan Pérez", None)),
+    ],
+)
+def test_userinfo_separa_apellido_solo_si_google_lo_manda_separado(monkeypatch, datos, esperado):
+    from app.services import auth0 as modulo_auth0
+
+    monkeypatch.setattr(settings, "auth0_domain", "offix-test.us.auth0.com")
+    monkeypatch.setattr(modulo_auth0.httpx, "get", lambda *args, **kwargs: _RespuestaUserinfo(datos))
+
+    perfil = modulo_auth0.Auth0Service()._userinfo("token-de-prueba")
+
+    assert (perfil.nombre, perfil.apellido) == esperado
+
+
+def test_login_con_google_guarda_apellido_separado(client, db_session, auth0):
+    auth0.perfil = PerfilGoogle(email="separado@test.com", nombre="Juan", apellido="Pérez")
+    login = _iniciar_login(client)
+
+    _callback(client, code="codigo-valido", state=_state_de(login))
+
+    usuario = db_session.query(Usuario).filter(Usuario.email == "separado@test.com").one()
+    assert (usuario.nombre, usuario.apellido) == ("Juan", "Pérez")

@@ -35,7 +35,9 @@ class SolicitudResena(Base):
     # El nombre siempre se carga en el modal "Datos del Cliente"; de los dos
     # datos de contacto hay que cargar al menos uno (lo valida el schema).
     nombre_cliente = Column(String(100), nullable=False)
-    telefono_cliente = Column(String(20), nullable=True)
+    # Teléfono del cliente partido, igual que el del Profesional (característica + número).
+    telefono_cliente_codigo_area = Column(String(4), nullable=True)
+    telefono_cliente_numero = Column(String(8), nullable=True)
     email_cliente = Column(String(255), nullable=True)
 
     origen = Column(String(50), nullable=False)
@@ -43,6 +45,13 @@ class SolicitudResena(Base):
     intentos_rechazo = Column(Integer, nullable=False, default=0)
     fecha_generacion = Column(DateTime(timezone=True), server_default=func.now())
     fecha_expiracion = Column(DateTime(timezone=True), nullable=False)
+
+    @property
+    def telefono_cliente_completo(self) -> str | None:
+        """Los 10 dígitos del teléfono del cliente, o None si no cargó teléfono."""
+        if not self.telefono_cliente_codigo_area or not self.telefono_cliente_numero:
+            return None
+        return f"{self.telefono_cliente_codigo_area}{self.telefono_cliente_numero}"
 
     oferente = relationship("Oferente", back_populates="solicitudes_resena")
     resenas = relationship("Resena", back_populates="solicitud", cascade="all, delete-orphan")

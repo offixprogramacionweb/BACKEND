@@ -7,7 +7,7 @@ from pydantic import BaseModel, BeforeValidator, ConfigDict, Field, ValidationIn
 from pydantic_core import PydanticCustomError
 
 from app.core.catalogos import DIAS_VALIDOS, ETIQUETA_EXPERIENCIA
-from app.services.mensajes import normalizar_telefono, telefono_es_valido
+from app.services.mensajes import codigo_area_es_valido, numero_linea_es_valido, telefono_partes_son_validas
 
 NOMBRE_RE = re.compile(r"[A-Za-zÁÉÍÓÚÜÑáéíóúüñ .'&-]+")
 DIGITOS_RE = re.compile(r"[0-9]+")
@@ -60,7 +60,9 @@ class _DatosOferente(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     nombre: str | None = Field(default=None, min_length=2, max_length=150)
-    telefono: str | None = None
+    apellido: str | None = Field(default=None, min_length=2, max_length=150, description="Opcional: se omite en las razones sociales.")
+    telefono_codigo_area: str | None = None
+    telefono_numero: str | None = None
     categoria_id: int | None = None
     especialidad: TextoOpcional = Field(default=None, max_length=100)
     experiencia: TextoOpcional = None
@@ -77,21 +79,32 @@ class _DatosOferente(BaseModel):
             return {clave: valor for clave, valor in datos.items() if clave != "email"}
         return datos
 
-    @field_validator("nombre")
+    @field_validator("nombre", "apellido")
     @classmethod
     def validar_nombre(cls, valor: str | None) -> str | None:
         if valor is not None and not NOMBRE_RE.fullmatch(valor):
             raise PydanticCustomError("nombre_invalido", "Solo se permiten letras, espacios, punto, apóstrofe, guion y &")
         return valor
 
-    @field_validator("telefono")
+    @field_validator("telefono_codigo_area")
     @classmethod
-    def validar_telefono(cls, valor: str | None) -> str | None:
+    def validar_codigo_area(cls, valor: str | None) -> str | None:
+        if valor is not None and not codigo_area_es_valido(valor):
+            raise PydanticCustomError("telefono_invalido", "Código de área: de 2 a 4 dígitos, sin 0 al inicio")
+        return valor
+
+    @field_validator("telefono_numero")
+    @classmethod
+    def validar_numero(cls, valor: str | None, info: ValidationInfo) -> str | None:
         if valor is None:
             return valor
-        if not telefono_es_valido(valor):
-            raise PydanticCustomError("telefono_invalido", "Ingresa 10 dígitos, con guion opcional. Sin 0, 15 o +54 al inicio.")
-        return normalizar_telefono(valor)
+        if not numero_linea_es_valido(valor):
+            raise PydanticCustomError("telefono_invalido", "Número: de 6 a 8 dígitos")
+        codigo = info.data.get("telefono_codigo_area")
+        # Si el código ya falló, su error ya va en la respuesta: no se repite acá.
+        if codigo is not None and not telefono_partes_son_validas(codigo, valor):
+            raise PydanticCustomError("telefono_invalido", "Código de área y número tienen que sumar 10 dígitos")
+        return valor
 
     @field_validator("experiencia")
     @classmethod
@@ -136,9 +149,11 @@ class OferenteRegistro(_DatosOferente):
         str_strip_whitespace=True,
         json_schema_extra={
             "example": {
-                "nombre": "Serena Ludueña",
+                "nombre": "Serena",
+                "apellido": "Ludueña",
                 "dni_cuit": "27-30111222-6",
-                "telefono": "3564-400111",
+                "telefono_codigo_area": "3564",
+                "telefono_numero": "400111",
                 "categoria_id": 1,
                 "especialidad": "Instalaciones domiciliarias",
                 "experiencia": "3_A_5",
@@ -151,9 +166,16 @@ class OferenteRegistro(_DatosOferente):
         },
     )
 
-    nombre: str = Field(min_length=2, max_length=150, description="Nombre y apellido, o razón social. Un solo campo.")
+    nombre: str = Field(min_length=2, max_length=150, description="Nombre o nombres. Para una razón social, va acá.")
+    apellido: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=150,
+        description="Apellido o apellidos. Opcional: en una razón social se omite.",
+    )
     dni_cuit: str = Field(description="8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales.")
-    telefono: str = Field(description="10 dígitos con guion opcional. Sin 0, 15 ni +54.")
+    telefono_codigo_area: str = Field(description="Característica: de 2 a 4 dígitos, sin 0 al inicio (11, 351, 3564).")
+    telefono_numero: str = Field(description="Número de línea: de 6 a 8 dígitos. Característica + número suman 10.")
     categoria_id: int = Field(description="Categoría u oficio principal, activa.")
     dias_atencion: list[int] = Field(description="Días ISO: 1 = lunes … 7 = domingo. Al menos uno.")
     hora_inicio_atencion: time = Field(description="HH:MM, minutos 00 o 30.")
@@ -207,11 +229,13 @@ class OferentePublicoOut(BaseModel):
 
     id_oferente: int
     nombre: str
+    apellido: str | None = Field(default=None, description="Null en razones sociales y en perfiles anteriores a la separación.")
     categoria_id: int | None = None
     categoria: CategoriaRef | None = None
     especialidad: str | None = None
     experiencia: ExperienciaRef | None = None
-    telefono: str
+    telefono_codigo_area: str
+    telefono_numero: str
     whatsapp_url: str | None = Field(
         default=None,
         description="HU-06: link wa.me con el mensaje de contacto precargado. null si el teléfono no es válido (CA03).",
@@ -241,3 +265,14 @@ class OferentePrivadoOut(OferentePublicoOut):
     dni_cuit: str
     estado_verificacion: str
     cantidad_rechazos_acumulados: int = Field(description="Dato interno de moderación; no se expone al público.")
+
+
+class OferentesPaginadosOut(BaseModel):
+    """Respuesta de `GET /oferentes`: una página de perfiles públicos y lo que
+    hace falta para armar el paginador."""
+
+    items: list[OferentePublicoOut]
+    pagina: int = Field(description="Página devuelta, desde 1.")
+    por_pagina: int = Field(description="Tamaño de página pedido: 10 o 25.")
+    total: int = Field(description="Cantidad de profesionales que cumplen el filtro, en todas las páginas.")
+    total_paginas: int = Field(description="0 si no hay resultados.")

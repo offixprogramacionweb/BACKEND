@@ -97,6 +97,7 @@ def perfil_actual(usuario: Usuario = Depends(get_current_user), db: Session = De
         id_usuario=usuario.id_usuario,
         email=usuario.email,
         nombre=usuario.nombre,
+        apellido=usuario.apellido,
         rol=usuario.rol,
         requiere_registro=usuario.rol == RolUsuario.OFERENTE and db.get(Oferente, usuario.id_usuario) is None,
         fidelizado=usuario.fidelizado,
@@ -174,6 +175,7 @@ def callback_login_google(
         if usuario.estado_cuenta != EstadoCuenta.ACTIVA:
             return _redirect_error("cuenta_inactiva")
         usuario.nombre = perfil.nombre
+        usuario.apellido = perfil.apellido
     else:
         usuario = Usuario(
             email=perfil.email,
@@ -183,6 +185,7 @@ def callback_login_google(
             password_hash=hash_password(secrets.token_urlsafe(32)),
             rol=RolUsuario.OFERENTE,
             nombre=perfil.nombre,
+            apellido=perfil.apellido,
         )
         db.add(usuario)
     db.commit()

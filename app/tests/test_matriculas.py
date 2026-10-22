@@ -22,7 +22,7 @@ def crear_oferente(client, db_session, email: str, nombre: str, apellido: str, d
     categoria = crear_categoria_db(db_session, nombre=f"Categoria-{email}")
     respuesta = client.post(
         "/api/v1/oferentes",
-        json=formulario_registro(categoria.id_categoria, dni_cuit=dni_cuit, nombre=f"{nombre} {apellido}"),
+        json=formulario_registro(categoria.id_categoria, dni_cuit=dni_cuit, nombre=nombre, apellido=apellido),
         headers={"Authorization": f"Bearer {token}"},
     )
     assert respuesta.status_code == 201, respuesta.text

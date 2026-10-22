@@ -41,6 +41,7 @@ class PerfilOut(BaseModel):
     id_usuario: int
     email: EmailStr
     nombre: str | None = Field(default=None, description="Viene de Google. Vacío para cuentas que solo usaron email/password.")
+    apellido: str | None = Field(default=None, description="Viene de Google solo si lo manda separado; si no, va vacío y el nombre trae el texto completo.")
     rol: RolUsuario
     requiere_registro: bool = Field(
         default=False,

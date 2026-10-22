@@ -40,6 +40,7 @@ class Auth0Error(Exception):
 class PerfilGoogle:
     email: str
     nombre: str
+    apellido: str | None = None
 
 
 class Auth0Service:
@@ -100,6 +101,12 @@ class Auth0Service:
         if not email or not perfil.get("email_verified", False):
             raise Auth0Error("El perfil de Google no trae un mail verificado")
 
+        # Si Google manda nombre y apellido por separado, se guardan separados.
+        # Si no, el nombre completo va tal cual en `nombre`, como antes.
+        nombre_pila = (perfil.get("given_name") or "").strip()
+        apellidos = (perfil.get("family_name") or "").strip()
+        if nombre_pila and apellidos:
+            return PerfilGoogle(email=email, nombre=nombre_pila, apellido=apellidos)
         nombre = perfil.get("name") or email.split("@")[0]
         return PerfilGoogle(email=email, nombre=nombre)
 

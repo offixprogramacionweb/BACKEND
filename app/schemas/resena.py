@@ -1,8 +1,9 @@
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr, Field, field_validator
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, ValidationInfo, field_validator
+from pydantic_core import PydanticCustomError
 
-from app.services.mensajes import normalizar_telefono, telefono_es_valido
+from app.services.mensajes import codigo_area_es_valido, numero_linea_es_valido, telefono_partes_son_validas
 
 
 class CriteriosValoracion(BaseModel):
@@ -55,30 +56,45 @@ class SolicitudResenaCreate(BaseModel):
         json_schema_extra={
             "example": {
                 "nombre_cliente": "Juan Cliente",
-                "telefono_cliente": "351-6924551",
+                "telefono_cliente_codigo_area": "351",
+                "telefono_cliente_numero": "6924551",
                 "email_cliente": "juan.cliente@example.com",
             }
         }
     )
 
     nombre_cliente: str = Field(min_length=2, max_length=100, description="Nombre del cliente. Obligatorio.")
-    telefono_cliente: str | None = Field(
+    telefono_cliente_codigo_area: str | None = Field(
         default=None,
-        description="10 dígitos: 3 o 4 de código de área + 7 o 6 de línea. Se acepta el guión (`351-6924551`). Sin 0, sin 15 y sin +54.",
+        description="Característica del cliente: de 2 a 4 dígitos, sin 0 al inicio (11, 351, 3564). Va junto con el número.",
+    )
+    telefono_cliente_numero: str | None = Field(
+        default=None,
+        description="Número del cliente: de 6 a 8 dígitos. Característica + número suman 10. Sin 15 ni +54.",
     )
     email_cliente: EmailStr | None = Field(default=None, description="Correo del cliente, con validación estándar de email.")
 
-    @field_validator("telefono_cliente")
+    @field_validator("telefono_cliente_codigo_area")
     @classmethod
-    def validar_telefono(cls, value: str | None) -> str | None:
+    def validar_codigo_area(cls, value: str | None) -> str | None:
+        if value is None or not value.strip():
+            return None
+        if not codigo_area_es_valido(value.strip()):
+            raise PydanticCustomError("telefono_invalido", "Código de área: de 2 a 4 dígitos, sin 0 al inicio")
+        return value.strip()
+
+    @field_validator("telefono_cliente_numero")
+    @classmethod
+    def validar_numero(cls, value: str | None, info: ValidationInfo) -> str | None:
         if value is None or not value.strip():
             return None
         value = value.strip()
-        if not telefono_es_valido(value):
-            raise ValueError(
-                "Teléfono inválido: se esperan 10 dígitos (código de área + línea), con guión opcional, sin 0, sin 15 y sin +54"
-            )
-        return normalizar_telefono(value)
+        if not numero_linea_es_valido(value):
+            raise PydanticCustomError("telefono_invalido", "Número: de 6 a 8 dígitos")
+        codigo = info.data.get("telefono_cliente_codigo_area")
+        if codigo is not None and not telefono_partes_son_validas(codigo, value):
+            raise PydanticCustomError("telefono_invalido", "Código de área y número tienen que sumar 10 dígitos")
+        return value
 
 
 
@@ -93,7 +109,8 @@ class SolicitudResenaOut(BaseModel):
     codigo_unico: str = Field(description="Código único que identifica el enlace de reseña.")
     origen: str = Field(description="WhatsApp | Email | Ambos — canal por el que se envía el enlace.")
     nombre_cliente: str
-    telefono_cliente: str | None = None
+    telefono_cliente_codigo_area: str | None = None
+    telefono_cliente_numero: str | None = None
     email_cliente: str | None = None
     estado: str = Field(description="Pendiente_Uso | Utilizada | Expirada")
     fecha_generacion: datetime
@@ -118,7 +135,8 @@ class SolicitudResenaVistaOut(BaseModel):
                 "oferente_id": 1,
                 "nombre_oferente": "María Gómez",
                 "nombre_cliente": "Juan Cliente",
-                "telefono_cliente": "3516924551",
+                "telefono_cliente_codigo_area": "351",
+                "telefono_cliente_numero": "6924551",
                 "email_cliente": None,
                 "estado": "Pendiente_Uso",
                 "vencida": False,
@@ -132,7 +150,8 @@ class SolicitudResenaVistaOut(BaseModel):
     oferente_id: int
     nombre_oferente: str = Field(description="Nombre y apellido del Profesional que se va a calificar.")
     nombre_cliente: str
-    telefono_cliente: str | None = None
+    telefono_cliente_codigo_area: str | None = None
+    telefono_cliente_numero: str | None = None
     email_cliente: str | None = Field(default=None, description="Viene vacío el dato de contacto que no se haya cargado.")
     estado: str = Field(description="Pendiente_Uso | Utilizada | Expirada")
     vencida: bool = Field(description="true si pasaron más de los días de validez desde la generación.")
@@ -219,7 +238,8 @@ class ResenaPrivadaOut(ResenaOut):
     pública, expone el contacto del cliente: es una decisión explícita del
     equipo, para que pueda verificar la identidad y comunicarse."""
 
-    telefono_cliente: str | None = None
+    telefono_cliente_codigo_area: str | None = None
+    telefono_cliente_numero: str | None = None
     email_cliente: str | None = None
 
 

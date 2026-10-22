@@ -28,6 +28,9 @@ class Usuario(Base):
     # lo pide. Se actualiza en cada login con Google, que es la fuente de
     # verdad de este dato para esas cuentas.
     nombre = Column(String(150), nullable=True)
+    # Apellido que viene separado de Google (given_name / family_name). NULL si Google
+    # solo manda el nombre completo: en ese caso `nombre` queda con el texto tal cual.
+    apellido = Column(String(150), nullable=True)
     rol = Column(
         Enum(
             RolUsuario,

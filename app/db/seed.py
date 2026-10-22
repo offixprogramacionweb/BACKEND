@@ -55,10 +55,12 @@ LUNES_A_VIERNES = [1, 2, 3, 4, 5]
 OFERENTES_DEMO = [
     dict(
         email="juan.perez@offix.example.com",
-        nombre="Juan Pérez",
+        nombre="Juan",
+        apellido="Pérez",
         categoria="Electricista",
         dni_cuit="20301112220",
-        telefono="3564400111",
+        telefono_codigo_area="3564",
+        telefono_numero="400111",
         estado_verificacion=EstadoVerificacion.VERIFICADO,
     ),
     dict(
@@ -66,18 +68,22 @@ OFERENTES_DEMO = [
         # Nombre real del padrón de Gasistas (matrícula 1000008919), para
         # poder demostrar HU-02 de punta a punta: con un nombre inventado el
         # match contra el padrón lo rechaza.
-        nombre="María Clara Alessi",
+        nombre="María Clara",
+        apellido="Alessi",
         categoria="Gasista",
         dni_cuit="27283334444",
-        telefono="3564400222",
+        telefono_codigo_area="3564",
+        telefono_numero="400222",
         estado_verificacion=EstadoVerificacion.VERIFICADO,
     ),
     dict(
         email="carlos.fernandez@offix.example.com",
-        nombre="Carlos Fernández",
+        nombre="Carlos",
+        apellido="Fernández",
         categoria="Plomero",
         dni_cuit="20255556666",
-        telefono="3564400333",
+        telefono_codigo_area="3564",
+        telefono_numero="400333",
         estado_verificacion=EstadoVerificacion.PENDIENTE,
     ),
     dict(
@@ -85,45 +91,56 @@ OFERENTES_DEMO = [
         # Nombre real del padrón de Aire acondicionado (matrícula 28408435),
         # igual que se hizo con la Gasista de demo: con un nombre inventado el
         # match contra el padrón la rechaza.
-        nombre="Martin Abatedaga",
+        nombre="Martin",
+        apellido="Abatedaga",
         categoria="Técnico en Aire Acondicionado",
         dni_cuit="27267778898",
-        telefono="3564400444",
+        telefono_codigo_area="3564",
+        telefono_numero="400444",
         estado_verificacion=EstadoVerificacion.VERIFICADO,
     ),
     dict(
         email="sergio.diaz@offix.example.com",
-        nombre="Sergio Díaz",
+        nombre="Sergio",
+        apellido="Díaz",
         categoria="Albañil",
         dni_cuit="20319990004",
-        telefono="3564400555",
+        telefono_codigo_area="3564",
+        telefono_numero="400555",
         estado_verificacion=EstadoVerificacion.PENDIENTE,
     ),
     dict(
         email="ana.torres@offix.example.com",
-        nombre="Ana Torres",
+        nombre="Ana",
+        apellido="Torres",
         categoria="Carpintero",
         dni_cuit="27292223337",
-        telefono="3564400666",
+        telefono_codigo_area="3564",
+        telefono_numero="400666",
         estado_verificacion=EstadoVerificacion.RECHAZADO,
     ),
     # HU-06 CA03: teléfono fuera de formato (0 inicial). La API no deja guardarlo,
     # así que el seed lo carga directo: el perfil existe pero no tiene WhatsApp.
     dict(
         email="pablo.ruiz@offix.example.com",
-        nombre="Pablo Ruiz",
+        nombre="Pablo",
+        apellido="Ruiz",
         categoria="Plomero",
         dni_cuit="20321230000",
-        telefono="0351-4400888",
+        # Caso inválido a propósito (0 inicial): el perfil no tiene link de WhatsApp (HU-06, CA03).
+        telefono_codigo_area="0351",
+        telefono_numero="4400888",
         estado_verificacion=EstadoVerificacion.PENDIENTE,
     ),
     # Caso de referencia de QA (HU-04): perfil completo con guardia y sin domingos.
     dict(
         email="serena.ludena@offix.example.com",
-        nombre="Serena Ludueña",
+        nombre="Serena",
+        apellido="Ludueña",
         categoria="Electricista",
         dni_cuit="27301112225",
-        telefono="3564400777",
+        telefono_codigo_area="3564",
+        telefono_numero="400777",
         estado_verificacion=EstadoVerificacion.PENDIENTE,
         especialidad="prueba",
         experiencia="3_A_5",
@@ -171,8 +188,10 @@ def get_or_create_oferente(db, categorias: dict[str, Categoria], datos: dict) ->
         # teléfono tienen que quedar con el formato que valida la API.
         oferente = usuario.oferente
         oferente.nombre = datos["nombre"]
+        oferente.apellido = datos["apellido"]
         oferente.dni_cuit = datos["dni_cuit"]
-        oferente.telefono = datos["telefono"]
+        oferente.telefono_codigo_area = datos["telefono_codigo_area"]
+        oferente.telefono_numero = datos["telefono_numero"]
         _completar_registro(db, oferente, datos)
         return oferente
 
@@ -189,10 +208,12 @@ def get_or_create_oferente(db, categorias: dict[str, Categoria], datos: dict) ->
         id_oferente=usuario.id_usuario,
         categoria_id=categorias[datos["categoria"]].id_categoria,
         nombre=datos["nombre"],
+        apellido=datos["apellido"],
         dni_cuit=datos["dni_cuit"],
-        telefono=datos["telefono"],
+        telefono_codigo_area=datos["telefono_codigo_area"],
+        telefono_numero=datos["telefono_numero"],
         estado_verificacion=datos["estado_verificacion"],
-        descripcion=f"{datos['nombre']} — {datos['categoria']} de prueba para demo.",
+        descripcion=f"{datos['nombre']} {datos['apellido']} — {datos['categoria']} de prueba para demo.",
     )
     db.add(oferente)
     db.flush()
@@ -267,7 +288,7 @@ def get_or_create_solicitud(db, oferente: Oferente, codigo: str, **datos_cliente
     solicitud = SolicitudResena(
         oferente_id=oferente.id_oferente,
         codigo_unico=codigo,
-        origen=OrigenSolicitud.desde_contacto(datos_cliente.get("telefono_cliente"), datos_cliente.get("email_cliente")),
+        origen=OrigenSolicitud.desde_contacto(datos_cliente.get("telefono_cliente_codigo_area"), datos_cliente.get("email_cliente")),
         fecha_expiracion=fecha_expiracion(),
         **datos_cliente,
     )
@@ -385,7 +406,8 @@ def run():
             oferentes[0],
             CODIGO_SOLICITUD_WHATSAPP,
             nombre_cliente="Cliente WhatsApp",
-            telefono_cliente="3516924551",
+            telefono_cliente_codigo_area="351",
+            telefono_cliente_numero="6924551",
         )
         get_or_create_resena_aceptada(db, oferentes[0])
         get_or_create_resenas_serena(db, serena)
@@ -396,7 +418,8 @@ def run():
             oferentes[1],
             "DEMO-PENDIENTE-0001",
             nombre_cliente="Gustavo Rivas",
-            telefono_cliente="3564692755",
+            telefono_cliente_codigo_area="3564",
+            telefono_cliente_numero="692755",
             email_cliente="gustavo.rivas@offix.example.com",
         )
         resena_pendiente = db.query(Resena).filter(Resena.solicitud_id == solicitud_pendiente.id_solicitud).first()
@@ -424,20 +447,20 @@ def run():
         print(f"Usuario admin: admin@offix.example.com / password: {PASSWORD_SEED}")
         print(f"Oferentes de ejemplo: password para todos: {PASSWORD_SEED}")
         print(f"Caso de QA (CA01): {EMAIL_SIN_REGISTRO} tiene rol Oferente y todavía no completó el registro.")
-        print(f"Perfil completo de referencia: {serena.nombre} (Lun a Vie, con guardia y dos reseñas aceptadas).")
+        print(f"Perfil completo de referencia: {serena.nombre_completo} (Lun a Vie, con guardia y dos reseñas aceptadas).")
         print("Enlaces de reseña de demo (sin login):")
         print(f"  - canal Email:    {CODIGO_SOLICITUD_EMAIL}")
         print(f"  - canal WhatsApp: {CODIGO_SOLICITUD_WHATSAPP}")
-        print(f"{oferentes[0].nombre} tiene una reseña aceptada de ejemplo en su perfil.")
-        print(f"{oferentes[1].nombre} tiene 1 notificación pendiente en la campana.")
+        print(f"{oferentes[0].nombre_completo} tiene una reseña aceptada de ejemplo en su perfil.")
+        print(f"{oferentes[1].nombre_completo} tiene 1 notificación pendiente en la campana.")
         print(f"Padrones cargados: {padron_cargado} matrículas nuevas (0 = ya estaban cargadas).")
         print(
-            f"  - Gasista (completo, 68 matriculados): logueate como {oferentes[1].nombre} y validá "
+            f"  - Gasista (completo, 68 matriculados): logueate como {oferentes[1].nombre_completo} y validá "
             f'{{"tipo_profesional": "Gasista", "numero_matricula": "{MATRICULA_DEMO_GASISTA}"}}'
         )
         print(
             f"  - Aire acondicionado (PARCIAL, 49 de 77 — falta la página 2 del export): logueate como "
-            f"{oferentes[3].nombre} y validá "
+            f"{oferentes[3].nombre_completo} y validá "
             f'{{"tipo_profesional": "Aire acondicionado", "numero_matricula": "{MATRICULA_DEMO_AIRE_ACONDICIONADO}"}}'
         )
     except Exception:

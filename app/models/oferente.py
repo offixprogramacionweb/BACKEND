@@ -22,10 +22,15 @@ class Oferente(Base):
     id_oferente = Column(Integer, ForeignKey("usuarios.id_usuario", ondelete="CASCADE"), primary_key=True)
     categoria_id = Column(Integer, ForeignKey("categorias.id_categoria"), nullable=True)
 
-    # Nombre y apellido en un solo campo (o razón social). Es lo que se compara con el padrón (HU-02).
+    # Nombre (o nombres) y apellido (o apellidos) por separado. Para una razón
+    # social, el nombre va en `nombre`. El apellido queda nullable en la base
+    # solo por las filas anteriores a este cambio; el schema lo exige al registrarse.
     nombre = Column(String(150), nullable=False)
+    apellido = Column(String(150), nullable=True)
     dni_cuit = Column(String(50), nullable=False, unique=True)
-    telefono = Column(String(50), nullable=False)
+    # Teléfono partido: característica sin 0 (2 a 4 dígitos) y número (6 a 8 dígitos).
+    telefono_codigo_area = Column(String(4), nullable=False)
+    telefono_numero = Column(String(8), nullable=False)
     # Legado de Sprint 1: el número de matrícula vive ahora en MATRICULAS (HU-02).
     # Sale de los schemas; dropear la columna se coordina con el compañero.
     numero_matricula = Column(String(100), nullable=True)
@@ -70,6 +75,17 @@ class Oferente(Base):
     alertas = relationship("AlertaAdministrador", back_populates="oferente", cascade="all, delete-orphan")
     matriculas = relationship("Matricula", back_populates="oferente", cascade="all, delete-orphan")
     validaciones_matricula = relationship("ValidacionMatricula", back_populates="oferente", cascade="all, delete-orphan")
+
+    @property
+    def nombre_completo(self) -> str:
+        """Nombre y apellido juntos: es lo que se compara con el padrón (HU-02)
+        y lo que se muestra en los mensajes al cliente."""
+        return " ".join(parte for parte in (self.nombre, self.apellido) if parte)
+
+    @property
+    def telefono_completo(self) -> str:
+        """Los 10 dígitos del teléfono, sin guion: lo que espera `mensajes`."""
+        return f"{self.telefono_codigo_area}{self.telefono_numero}"
 
     @property
     def tiene_matricula_validada(self) -> bool:

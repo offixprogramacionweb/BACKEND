@@ -4,7 +4,7 @@ import itertools
 
 from app.models.notificacion import EstadoNotificacion, Notificacion, TipoNotificacion
 from app.models.oferente import Oferente
-from app.tests.conftest import CRITERIOS_VALIDOS, crear_oferente_completo
+from app.tests.conftest import CRITERIOS_VALIDOS, crear_oferente_completo, telefono_cliente_partido, telefono_cliente_de
 
 _correos_unicos = itertools.count(1)
 
@@ -77,7 +77,7 @@ def test_la_notificacion_muestra_el_contacto_y_no_el_contenido(client, db_sessio
         client,
         oferente_id,
         token=token,
-        telefono_cliente="351-6924551",
+        **telefono_cliente_partido("351-6924551"),
         email_cliente="cliente@test.com",
         calificaciones={
             "criterios": {"precio": 1, "calidad": 1, "atencion": 1, "puntualidad": 1},
@@ -88,7 +88,7 @@ def test_la_notificacion_muestra_el_contacto_y_no_el_contenido(client, db_sessio
     notificacion = client.get("/api/v1/notificaciones", headers=_auth(token)).json()[0]
 
     assert notificacion["nombre_cliente"] == "Juan Cliente"
-    assert notificacion["telefono_cliente"] == "3516924551"
+    assert telefono_cliente_de(notificacion) == "3516924551"
     assert notificacion["email_cliente"] == "cliente@test.com"
     # Ni el comentario ni la puntuación aparecen por ningún lado.
     assert "desastre" not in notificacion["mensaje"]
@@ -259,13 +259,13 @@ def test_el_promedio_es_el_de_todas_las_aceptadas(client, db_session):
 
 def test_la_respuesta_de_moderar_expone_el_contacto_al_dueno(client, db_session):
     token, oferente_id = crear_oferente_completo(client, db_session, email="contacto@test.com", dni_cuit="20-30000017-8")
-    resena = _dejar_resena(client, oferente_id, token=token, telefono_cliente="351-6924551", email_cliente="cliente@test.com")
+    resena = _dejar_resena(client, oferente_id, token=token, **telefono_cliente_partido("351-6924551"), email_cliente="cliente@test.com")
 
     cuerpo = client.patch(
         f"/api/v1/resenas/{resena['id_resena']}/moderar", json={"aceptar": True}, headers=_auth(token)
     ).json()
 
-    assert cuerpo["telefono_cliente"] == "3516924551"
+    assert telefono_cliente_de(cuerpo) == "3516924551"
     assert cuerpo["email_cliente"] == "cliente@test.com"
 
 
@@ -276,6 +276,6 @@ def test_el_listado_publico_no_expone_el_contacto(client, db_session):
 
     publica = client.get(f"/api/v1/oferentes/{oferente_id}/resenas").json()["items"][0]
 
-    assert "telefono_cliente" not in publica
+    assert "telefono_cliente_numero" not in publica
     assert "email_cliente" not in publica
     assert "contacto_cliente_ingresado" not in publica

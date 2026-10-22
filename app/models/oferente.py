@@ -28,9 +28,9 @@ class Oferente(Base):
     nombre = Column(String(150), nullable=False)
     apellido = Column(String(150), nullable=True)
     dni_cuit = Column(String(50), nullable=False, unique=True)
-    # Teléfono partido: característica sin 0 (3 o 4 dígitos) y número (6 o 7 dígitos).
+    # Teléfono partido: característica sin 0 (2 a 4 dígitos) y número (6 a 8 dígitos).
     telefono_codigo_area = Column(String(4), nullable=False)
-    telefono_numero = Column(String(7), nullable=False)
+    telefono_numero = Column(String(8), nullable=False)
     # Legado de Sprint 1: el número de matrícula vive ahora en MATRICULAS (HU-02).
     # Sale de los schemas; dropear la columna se coordina con el compañero.
     numero_matricula = Column(String(100), nullable=True)

@@ -2822,7 +2822,7 @@
             "title": "Nombre Cliente",
             "description": "Solo en las notificaciones de reseña."
           },
-          "telefono_cliente": {
+          "telefono_cliente_codigo_area": {
             "anyOf": [
               {
                 "type": "string"
@@ -2831,7 +2831,18 @@
                 "type": "null"
               }
             ],
-            "title": "Telefono Cliente"
+            "title": "Telefono Cliente Codigo Area"
+          },
+          "telefono_cliente_numero": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono Cliente Numero"
           },
           "email_cliente": {
             "anyOf": [
@@ -2942,7 +2953,8 @@
           "nombre_cliente": "Juan Cliente",
           "requiere_accion": true,
           "resena_id": 7,
-          "telefono_cliente": "3516924551",
+          "telefono_cliente_codigo_area": "351",
+          "telefono_cliente_numero": "6924551",
           "tipo": "Resena_Nueva"
         }
       },
@@ -2972,7 +2984,8 @@
                 "type": "null"
               }
             ],
-            "title": "Apellido"
+            "title": "Apellido",
+            "description": "Opcional: se omite en las razones sociales."
           },
           "telefono_codigo_area": {
             "anyOf": [
@@ -3170,7 +3183,7 @@
               }
             ],
             "title": "Apellido",
-            "description": "Null solo en perfiles anteriores a la separación de nombre y apellido."
+            "description": "Null en razones sociales y en perfiles anteriores a la separación."
           },
           "categoria_id": {
             "anyOf": [
@@ -3416,7 +3429,7 @@
               }
             ],
             "title": "Apellido",
-            "description": "Null solo en perfiles anteriores a la separación de nombre y apellido."
+            "description": "Null en razones sociales y en perfiles anteriores a la separación."
           },
           "categoria_id": {
             "anyOf": [
@@ -3636,21 +3649,28 @@
             "description": "Nombre o nombres. Para una razón social, va acá."
           },
           "apellido": {
-            "type": "string",
-            "maxLength": 150,
-            "minLength": 2,
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 150,
+                "minLength": 2
+              },
+              {
+                "type": "null"
+              }
+            ],
             "title": "Apellido",
-            "description": "Apellido o apellidos."
+            "description": "Apellido o apellidos. Opcional: en una razón social se omite."
           },
           "telefono_codigo_area": {
             "type": "string",
             "title": "Telefono Codigo Area",
-            "description": "Característica: 3 o 4 dígitos, sin 0 al inicio."
+            "description": "Característica: de 2 a 4 dígitos, sin 0 al inicio (11, 351, 3564)."
           },
           "telefono_numero": {
             "type": "string",
             "title": "Telefono Numero",
-            "description": "Número de línea: 6 o 7 dígitos. Entre característica y número, 10 dígitos."
+            "description": "Número de línea: de 6 a 8 dígitos. Característica + número suman 10."
           },
           "categoria_id": {
             "type": "integer",
@@ -3727,7 +3747,6 @@
         "type": "object",
         "required": [
           "nombre",
-          "apellido",
           "telefono_codigo_area",
           "telefono_numero",
           "categoria_id",
@@ -3823,6 +3842,18 @@
             ],
             "title": "Nombre",
             "description": "Viene de Google. Vacío para cuentas que solo usaron email/password."
+          },
+          "apellido": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido",
+            "description": "Viene de Google solo si lo manda separado; si no, va vacío y el nombre trae el texto completo."
           },
           "rol": {
             "$ref": "#/components/schemas/RolUsuario"
@@ -4069,7 +4100,7 @@
             "format": "date-time",
             "title": "Fecha Creacion"
           },
-          "telefono_cliente": {
+          "telefono_cliente_codigo_area": {
             "anyOf": [
               {
                 "type": "string"
@@ -4078,7 +4109,18 @@
                 "type": "null"
               }
             ],
-            "title": "Telefono Cliente"
+            "title": "Telefono Cliente Codigo Area"
+          },
+          "telefono_cliente_numero": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono Cliente Numero"
           },
           "email_cliente": {
             "anyOf": [
@@ -4226,7 +4268,7 @@
             "title": "Nombre Cliente",
             "description": "Nombre del cliente. Obligatorio."
           },
-          "telefono_cliente": {
+          "telefono_cliente_codigo_area": {
             "anyOf": [
               {
                 "type": "string"
@@ -4235,8 +4277,20 @@
                 "type": "null"
               }
             ],
-            "title": "Telefono Cliente",
-            "description": "10 dígitos: 3 o 4 de código de área + 7 o 6 de línea. Se acepta el guión (`351-6924551`). Sin 0, sin 15 y sin +54."
+            "title": "Telefono Cliente Codigo Area",
+            "description": "Característica del cliente: de 2 a 4 dígitos, sin 0 al inicio (11, 351, 3564). Va junto con el número."
+          },
+          "telefono_cliente_numero": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono Cliente Numero",
+            "description": "Número del cliente: de 6 a 8 dígitos. Característica + número suman 10. Sin 15 ni +54."
           },
           "email_cliente": {
             "anyOf": [
@@ -4261,7 +4315,8 @@
         "example": {
           "email_cliente": "juan.cliente@example.com",
           "nombre_cliente": "Juan Cliente",
-          "telefono_cliente": "351-6924551"
+          "telefono_cliente_codigo_area": "351",
+          "telefono_cliente_numero": "6924551"
         }
       },
       "SolicitudResenaOut": {
@@ -4288,7 +4343,7 @@
             "type": "string",
             "title": "Nombre Cliente"
           },
-          "telefono_cliente": {
+          "telefono_cliente_codigo_area": {
             "anyOf": [
               {
                 "type": "string"
@@ -4297,7 +4352,18 @@
                 "type": "null"
               }
             ],
-            "title": "Telefono Cliente"
+            "title": "Telefono Cliente Codigo Area"
+          },
+          "telefono_cliente_numero": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono Cliente Numero"
           },
           "email_cliente": {
             "anyOf": [
@@ -4383,7 +4449,7 @@
             "type": "string",
             "title": "Nombre Cliente"
           },
-          "telefono_cliente": {
+          "telefono_cliente_codigo_area": {
             "anyOf": [
               {
                 "type": "string"
@@ -4392,7 +4458,18 @@
                 "type": "null"
               }
             ],
-            "title": "Telefono Cliente"
+            "title": "Telefono Cliente Codigo Area"
+          },
+          "telefono_cliente_numero": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Telefono Cliente Numero"
           },
           "email_cliente": {
             "anyOf": [
@@ -4453,7 +4530,8 @@
           "nombre_cliente": "Juan Cliente",
           "nombre_oferente": "María Gómez",
           "oferente_id": 1,
-          "telefono_cliente": "3516924551",
+          "telefono_cliente_codigo_area": "351",
+          "telefono_cliente_numero": "6924551",
           "utilizable": true,
           "vencida": false
         }

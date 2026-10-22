@@ -10,9 +10,9 @@ from urllib.parse import quote
 
 from app.core.config import settings
 
-# 10 dígitos en total: 3 o 4 de código de área + 7 o 6 de línea. Se acepta un
+# 10 dígitos en total: 2 a 4 de código de área + 6 a 8 de línea. Se acepta un
 # guión como separador. Sin 0 inicial, sin 15 y sin +54: eso lo pone el backend.
-TELEFONO_RE = re.compile(r"^\d{3,4}-?\d{6,7}$")
+TELEFONO_RE = re.compile(r"^\d{2,4}-?\d{6,8}$")
 
 PLANTILLA_INVITACION = """¡Hola!
 Gracias por confiar en {nombre_profesional} a través de Offix.
@@ -22,10 +22,10 @@ Calificá tu experiencia acá: {link_resena}
 Solo te va a tomar un minuto. ¡Gracias por ser parte de Offix!"""
 
 
-# Teléfono partido (HU-04): característica de 3 o 4 dígitos sin 0 inicial, y
-# número de 6 o 7 dígitos. Entre los dos tienen que sumar 10.
-CODIGO_AREA_RE = re.compile(r"[1-9]\d{2,3}")
-NUMERO_LINEA_RE = re.compile(r"\d{6,7}")
+# Teléfono partido (HU-04): característica de 2 a 4 dígitos sin 0 inicial (11,
+# 351, 3564...), y número de 6 a 8 dígitos. Entre los dos tienen que sumar 10.
+CODIGO_AREA_RE = re.compile(r"[1-9]\d{1,3}")
+NUMERO_LINEA_RE = re.compile(r"\d{6,8}")
 
 
 def codigo_area_es_valido(codigo: str) -> bool:

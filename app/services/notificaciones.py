@@ -18,7 +18,7 @@ from app.models.solicitud_resena import SolicitudResena
 
 def _contacto_del_cliente(solicitud: SolicitudResena) -> str:
     """Teléfono si se cargó; si no, el correo (texto literal de QA, caso A34)."""
-    return solicitud.telefono_cliente or solicitud.email_cliente or ""
+    return solicitud.telefono_cliente_completo or solicitud.email_cliente or ""
 
 
 def crear_notificacion_resena_nueva(db: Session, resena: Resena, solicitud: SolicitudResena) -> Notificacion:

@@ -95,6 +95,19 @@ def client(db_session, emails, auth0, monkeypatch):
         app.dependency_overrides.clear()
 
 
+def telefono_cliente_partido(telefono: str) -> dict:
+    """Parte un teléfono de prueba "característica-número" en los campos que espera la API.
+    Un texto sin guion va entero en la característica (y así queda como dato inválido)."""
+    codigo, _, numero = telefono.partition("-")
+    return {"telefono_cliente_codigo_area": codigo, "telefono_cliente_numero": numero or None}
+
+
+def telefono_cliente_de(datos: dict) -> str | None:
+    """Une característica y número de una respuesta, para comparar con el teléfono completo."""
+    codigo, numero = datos.get("telefono_cliente_codigo_area"), datos.get("telefono_cliente_numero")
+    return f"{codigo}{numero}" if codigo and numero else None
+
+
 PASSWORD = "Test1234!"
 
 

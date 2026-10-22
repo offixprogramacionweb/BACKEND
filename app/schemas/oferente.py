@@ -60,7 +60,7 @@ class _DatosOferente(BaseModel):
     model_config = ConfigDict(extra="forbid", str_strip_whitespace=True)
 
     nombre: str | None = Field(default=None, min_length=2, max_length=150)
-    apellido: str | None = Field(default=None, min_length=2, max_length=150)
+    apellido: str | None = Field(default=None, min_length=2, max_length=150, description="Opcional: se omite en las razones sociales.")
     telefono_codigo_area: str | None = None
     telefono_numero: str | None = None
     categoria_id: int | None = None
@@ -90,7 +90,7 @@ class _DatosOferente(BaseModel):
     @classmethod
     def validar_codigo_area(cls, valor: str | None) -> str | None:
         if valor is not None and not codigo_area_es_valido(valor):
-            raise PydanticCustomError("telefono_invalido", "Código de área: 3 o 4 dígitos, sin 0 al inicio")
+            raise PydanticCustomError("telefono_invalido", "Código de área: de 2 a 4 dígitos, sin 0 al inicio")
         return valor
 
     @field_validator("telefono_numero")
@@ -99,7 +99,7 @@ class _DatosOferente(BaseModel):
         if valor is None:
             return valor
         if not numero_linea_es_valido(valor):
-            raise PydanticCustomError("telefono_invalido", "Número: 6 o 7 dígitos")
+            raise PydanticCustomError("telefono_invalido", "Número: de 6 a 8 dígitos")
         codigo = info.data.get("telefono_codigo_area")
         # Si el código ya falló, su error ya va en la respuesta: no se repite acá.
         if codigo is not None and not telefono_partes_son_validas(codigo, valor):
@@ -167,10 +167,15 @@ class OferenteRegistro(_DatosOferente):
     )
 
     nombre: str = Field(min_length=2, max_length=150, description="Nombre o nombres. Para una razón social, va acá.")
-    apellido: str = Field(min_length=2, max_length=150, description="Apellido o apellidos.")
+    apellido: str | None = Field(
+        default=None,
+        min_length=2,
+        max_length=150,
+        description="Apellido o apellidos. Opcional: en una razón social se omite.",
+    )
     dni_cuit: str = Field(description="7 u 8 dígitos (DNI) o 11 con dígito verificador (CUIT). Guiones y puntos opcionales.")
-    telefono_codigo_area: str = Field(description="Característica: 3 o 4 dígitos, sin 0 al inicio.")
-    telefono_numero: str = Field(description="Número de línea: 6 o 7 dígitos. Entre característica y número, 10 dígitos.")
+    telefono_codigo_area: str = Field(description="Característica: de 2 a 4 dígitos, sin 0 al inicio (11, 351, 3564).")
+    telefono_numero: str = Field(description="Número de línea: de 6 a 8 dígitos. Característica + número suman 10.")
     categoria_id: int = Field(description="Categoría u oficio principal, activa.")
     dias_atencion: list[int] = Field(description="Días ISO: 1 = lunes … 7 = domingo. Al menos uno.")
     hora_inicio_atencion: time = Field(description="HH:MM, minutos 00 o 30.")
@@ -224,7 +229,7 @@ class OferentePublicoOut(BaseModel):
 
     id_oferente: int
     nombre: str
-    apellido: str | None = Field(default=None, description="Null solo en perfiles anteriores a la separación de nombre y apellido.")
+    apellido: str | None = Field(default=None, description="Null en razones sociales y en perfiles anteriores a la separación.")
     categoria_id: int | None = None
     categoria: CategoriaRef | None = None
     especialidad: str | None = None

@@ -29,7 +29,7 @@ from app.schemas.resena import (
     SolicitudResenaVistaOut,
 )
 from app.services.email import EmailError, EmailService, get_email_service, url_resena
-from app.services.mensajes import armar_whatsapp_url, normalizar_telefono
+from app.services.mensajes import armar_whatsapp_url
 from app.services.notificaciones import crear_notificacion_resena_nueva, resolver_notificacion_de_resena
 from app.services.resenas import recalcular_promedio
 
@@ -79,23 +79,24 @@ def _salida_privada(resena: Resena, solicitud: SolicitudResena) -> ResenaPrivada
         calificaciones_comentarios=resena.calificaciones_comentarios,
         estado=resena.estado,
         fecha_creacion=resena.fecha_creacion,
-        telefono_cliente=solicitud.telefono_cliente,
+        telefono_cliente_codigo_area=solicitud.telefono_cliente_codigo_area,
+        telefono_cliente_numero=solicitud.telefono_cliente_numero,
         email_cliente=solicitud.email_cliente,
     )
 
 
 def _respuesta_solicitud(solicitud: SolicitudResena, oferente: Oferente, email_enviado: bool) -> SolicitudResenaOut:
     link = url_resena(solicitud.codigo_unico)
-    whatsapp = (
-        armar_whatsapp_url(solicitud.telefono_cliente, _nombre_completo(oferente), link) if solicitud.telefono_cliente else None
-    )
+    telefono = solicitud.telefono_cliente_completo
+    whatsapp = armar_whatsapp_url(telefono, _nombre_completo(oferente), link) if telefono else None
     return SolicitudResenaOut(
         id_solicitud=solicitud.id_solicitud,
         oferente_id=solicitud.oferente_id,
         codigo_unico=solicitud.codigo_unico,
         origen=solicitud.origen,
         nombre_cliente=solicitud.nombre_cliente,
-        telefono_cliente=solicitud.telefono_cliente,
+        telefono_cliente_codigo_area=solicitud.telefono_cliente_codigo_area,
+        telefono_cliente_numero=solicitud.telefono_cliente_numero,
         email_cliente=solicitud.email_cliente,
         estado=solicitud.estado,
         fecha_generacion=solicitud.fecha_generacion,
@@ -106,20 +107,33 @@ def _respuesta_solicitud(solicitud: SolicitudResena, oferente: Oferente, email_e
     )
 
 
+def _hay_telefono_cliente(payload: SolicitudResenaCreate) -> bool:
+    return payload.telefono_cliente_codigo_area is not None and payload.telefono_cliente_numero is not None
+
+
+def _validar_par_telefono_cliente(payload: SolicitudResenaCreate) -> None:
+    """Característica y número van juntos: si cargó uno, el otro es obligatorio."""
+    if payload.telefono_cliente_codigo_area and not payload.telefono_cliente_numero:
+        raise error_validacion("telefono_cliente_numero", "requerido", "Complete este campo")
+    if payload.telefono_cliente_numero and not payload.telefono_cliente_codigo_area:
+        raise error_validacion("telefono_cliente_codigo_area", "requerido", "Complete este campo")
+
+
 def _validar_quien_genera(oferente: Oferente, es_dueno: bool, payload: SolicitudResenaCreate) -> None:
     """D8: sin login, el enlace solo se manda por correo y el correo es obligatorio.
     El Profesional dueño puede cargar teléfono, correo o los dos."""
+    _validar_par_telefono_cliente(payload)
     if es_dueno:
-        if not payload.telefono_cliente and not payload.email_cliente:
+        if not _hay_telefono_cliente(payload) and not payload.email_cliente:
             raise error_validacion(
-                "telefono_cliente",
+                "telefono_cliente_numero",
                 "contacto_requerido",
                 "Debe completar al menos un dato de contacto para poder generar el enlace.",
             )
         return
-    if payload.telefono_cliente:
+    if _hay_telefono_cliente(payload):
         raise error_validacion(
-            "telefono_cliente",
+            "telefono_cliente_numero",
             "telefono_no_permitido",
             "Para calificar sin iniciar sesión solo se pide el correo electrónico",
         )
@@ -132,8 +146,9 @@ def _validar_no_auto_resena(oferente: Oferente, payload: SolicitudResenaCreate) 
     es infalible (puede usar otra casilla), pero cierra el caso trivial."""
     if payload.email_cliente and oferente.usuario and payload.email_cliente.lower() == oferente.usuario.email.lower():
         raise error_validacion("email_cliente", "contacto_propio", "No podés generar un enlace de reseña para vos mismo")
-    if payload.telefono_cliente and normalizar_telefono(payload.telefono_cliente) == oferente.telefono_completo:
-        raise error_validacion("telefono_cliente", "contacto_propio", "No podés generar un enlace de reseña para vos mismo")
+    telefono_cliente = (payload.telefono_cliente_codigo_area or "") + (payload.telefono_cliente_numero or "")
+    if _hay_telefono_cliente(payload) and telefono_cliente == oferente.telefono_completo:
+        raise error_validacion("telefono_cliente_numero", "contacto_propio", "No podés generar un enlace de reseña para vos mismo")
 
 
 def _verificar_limites(db: Session, oferente_id: int, email_cliente: str | None) -> None:
@@ -248,9 +263,10 @@ def generar_solicitud_resena(
         oferente_id=oferente.id_oferente,
         codigo_unico=uuid.uuid4().hex,
         nombre_cliente=payload.nombre_cliente,
-        telefono_cliente=payload.telefono_cliente,
+        telefono_cliente_codigo_area=payload.telefono_cliente_codigo_area,
+        telefono_cliente_numero=payload.telefono_cliente_numero,
         email_cliente=payload.email_cliente,
-        origen=OrigenSolicitud.desde_contacto(payload.telefono_cliente, payload.email_cliente),
+        origen=OrigenSolicitud.desde_contacto(payload.telefono_cliente_codigo_area, payload.email_cliente),
         fecha_expiracion=_ahora() + timedelta(days=settings.solicitud_resena_dias_validez),
     )
     db.add(solicitud)
@@ -309,7 +325,8 @@ def ver_solicitud_resena(codigo_unico: str, db: Session = Depends(get_db)):
         oferente_id=solicitud.oferente_id,
         nombre_oferente=_nombre_completo(oferente),
         nombre_cliente=solicitud.nombre_cliente,
-        telefono_cliente=solicitud.telefono_cliente,
+        telefono_cliente_codigo_area=solicitud.telefono_cliente_codigo_area,
+        telefono_cliente_numero=solicitud.telefono_cliente_numero,
         email_cliente=solicitud.email_cliente,
         estado=solicitud.estado,
         vencida=vencida,
@@ -362,7 +379,7 @@ def registrar_resena(payload: ResenaCreate, db: Session = Depends(get_db)):
         oferente_id=solicitud.oferente_id,
         solicitud_id=solicitud.id_solicitud,
         nombre_cliente=solicitud.nombre_cliente,
-        contacto_cliente_ingresado=solicitud.email_cliente or solicitud.telefono_cliente,
+        contacto_cliente_ingresado=solicitud.email_cliente or solicitud.telefono_cliente_completo,
         calificaciones_comentarios=payload.calificaciones_comentarios.a_json(),
         estado=EstadoResena.PENDIENTE_ACEPTACION,
     )

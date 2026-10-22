@@ -4,7 +4,7 @@ from urllib.parse import unquote
 
 from app.models.alerta_admin import AlertaAdministrador
 from app.models.solicitud_resena import SolicitudResena
-from app.tests.conftest import CRITERIOS_VALIDOS, PUNTUACION_GLOBAL_ESPERADA, crear_oferente_completo
+from app.tests.conftest import CRITERIOS_VALIDOS, PUNTUACION_GLOBAL_ESPERADA, crear_oferente_completo, telefono_cliente_partido, telefono_cliente_de
 
 DATOS_CLIENTE = {"nombre_cliente": "Juan Cliente", "email_cliente": "cliente@test.com"}
 _correos_unicos = itertools.count(1)
@@ -71,7 +71,7 @@ def test_solo_telefono_devuelve_whatsapp_url_y_no_manda_correo(client, db_sessio
 
     response = client.post(
         f"/api/v1/oferentes/{oferente_id}/solicitudes-resena",
-        json={"nombre_cliente": "Juan Cliente", "telefono_cliente": "351-6924551"},
+        json={"nombre_cliente": "Juan Cliente", **telefono_cliente_partido("351-6924551")},
         headers=_auth(token),
     )
 
@@ -82,7 +82,7 @@ def test_solo_telefono_devuelve_whatsapp_url_y_no_manda_correo(client, db_sessio
     assert emails.enviados == []
     assert cuerpo["whatsapp_url"].startswith("https://wa.me/5493516924551?text=")
     # El teléfono se guarda normalizado, sin el guión.
-    assert cuerpo["telefono_cliente"] == "3516924551"
+    assert telefono_cliente_de(cuerpo) == "3516924551"
 
 
 def test_solo_mail_manda_el_correo_y_no_devuelve_whatsapp_url(client, db_session, emails):
@@ -110,7 +110,7 @@ def test_los_dos_contactos_usan_los_dos_canales(client, db_session, emails):
 
     response = client.post(
         f"/api/v1/oferentes/{oferente_id}/solicitudes-resena",
-        json={"nombre_cliente": "Juan Cliente", "telefono_cliente": "3564-692755", "email_cliente": "juan@test.com"},
+        json={"nombre_cliente": "Juan Cliente", **telefono_cliente_partido("3564-692755"), "email_cliente": "juan@test.com"},
         headers=_auth(token),
     )
 
@@ -145,7 +145,7 @@ def test_telefono_con_caracteres_no_numericos_422(client, db_session):
 
     response = client.post(
         f"/api/v1/oferentes/{oferente_id}/solicitudes-resena",
-        json={"nombre_cliente": "Juan Cliente", "telefono_cliente": "351-69A4551"},
+        json={"nombre_cliente": "Juan Cliente", **telefono_cliente_partido("351-69A4551")},
         headers=_auth(token),
     )
 
@@ -159,7 +159,7 @@ def test_telefono_con_0_15_o_prefijo_pais_422(client, db_session):
     for telefono in ("0351-6924551", "351-156924551", "+543516924551"):
         response = client.post(
             f"/api/v1/oferentes/{oferente_id}/solicitudes-resena",
-            json={"nombre_cliente": "Juan Cliente", "telefono_cliente": telefono},
+            json={"nombre_cliente": "Juan Cliente", **telefono_cliente_partido(telefono)},
             headers=_auth(token),
         )
         assert response.status_code == 422, f"{telefono} debería rechazarse"
@@ -193,7 +193,7 @@ def test_whatsapp_url_lleva_el_mensaje_de_qa_con_el_link(client, db_session):
 
     response = client.post(
         f"/api/v1/oferentes/{oferente_id}/solicitudes-resena",
-        json={"nombre_cliente": "Juan Cliente", "telefono_cliente": "3516924551"},
+        json={"nombre_cliente": "Juan Cliente", **telefono_cliente_partido("351-6924551")},
         headers=_auth(token),
     )
 
@@ -210,14 +210,14 @@ def test_whatsapp_url_lleva_el_mensaje_de_qa_con_el_link(client, db_session):
 
 def test_ver_solicitud_devuelve_los_datos_precargados(client, db_session):
     token, oferente_id = crear_oferente_completo(client, db_session, email="vista@test.com", dni_cuit="20-10000012-2")
-    codigo = _generar_solicitud(client, oferente_id, token=token, telefono_cliente="3516924551", email_cliente="cliente@test.com")
+    codigo = _generar_solicitud(client, oferente_id, token=token, **telefono_cliente_partido("351-6924551"), email_cliente="cliente@test.com")
 
     response = client.get(f"/api/v1/solicitudes-resena/{codigo}")
 
     assert response.status_code == 200, response.text
     cuerpo = response.json()
     assert cuerpo["nombre_cliente"] == "Juan Cliente"
-    assert cuerpo["telefono_cliente"] == "3516924551"
+    assert telefono_cliente_de(cuerpo) == "3516924551"
     assert cuerpo["email_cliente"] == "cliente@test.com"
     assert cuerpo["nombre_oferente"] == "Oferente Prueba"
     assert cuerpo["utilizable"] is True

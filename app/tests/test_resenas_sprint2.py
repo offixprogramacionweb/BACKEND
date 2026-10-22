@@ -8,7 +8,7 @@ from app.core.config import settings
 from app.models.alerta_admin import AlertaAdministrador
 from app.models.notificacion import Notificacion
 from app.models.solicitud_resena import SolicitudResena
-from app.tests.conftest import CRITERIOS_VALIDOS, crear_oferente_completo
+from app.tests.conftest import CRITERIOS_VALIDOS, crear_oferente_completo, telefono_cliente_partido, telefono_cliente_de
 
 _correos = itertools.count(1)
 
@@ -46,10 +46,10 @@ def _dejar_resena(client, oferente_id, token=None, **datos):
 def test_anonimo_con_telefono_da_422_telefono_no_permitido(client, db_session):
     _, oferente_id = crear_oferente_completo(client, db_session, email="anon.tel@test.com", dni_cuit="20-30111222-0")
 
-    respuesta = _generar(client, oferente_id, telefono_cliente="351-6924551", email_cliente=_nuevo_correo())
+    respuesta = _generar(client, oferente_id, **telefono_cliente_partido("351-6924551"), email_cliente=_nuevo_correo())
 
     assert respuesta.status_code == 422
-    assert _codigos(respuesta) == {"telefono_cliente": "telefono_no_permitido"}
+    assert _codigos(respuesta) == {"telefono_cliente_numero": "telefono_no_permitido"}
     assert db_session.query(SolicitudResena).count() == 0
 
 
@@ -67,16 +67,16 @@ def test_dueno_sin_ningun_contacto_da_422_contacto_requerido(client, db_session)
     respuesta = _generar(client, oferente_id, token=token)
 
     assert respuesta.status_code == 422
-    assert _codigos(respuesta) == {"telefono_cliente": "contacto_requerido"}
+    assert _codigos(respuesta) == {"telefono_cliente_numero": "contacto_requerido"}
 
 
 def test_otro_usuario_logueado_se_trata_como_anonimo(client, db_session):
     _, oferente_id = crear_oferente_completo(client, db_session, email="dueno.b@test.com", dni_cuit="20-30111222-0")
     token_otro, _ = crear_oferente_completo(client, db_session, email="otro.b@test.com", dni_cuit="20-30111223-9")
 
-    respuesta = _generar(client, oferente_id, token=token_otro, telefono_cliente="351-6924551")
+    respuesta = _generar(client, oferente_id, token=token_otro, **telefono_cliente_partido("351-6924551"))
 
-    assert _codigos(respuesta) == {"telefono_cliente": "telefono_no_permitido"}
+    assert _codigos(respuesta) == {"telefono_cliente_numero": "telefono_no_permitido"}
 
 
 def test_token_invalido_da_401_y_no_se_trata_como_anonimo(client, db_session):
@@ -90,7 +90,7 @@ def test_token_invalido_da_401_y_no_se_trata_como_anonimo(client, db_session):
 def test_dueno_puede_cargar_telefono_y_correo(client, db_session):
     token, oferente_id = crear_oferente_completo(client, db_session, email="dueno.ok@test.com", dni_cuit="20-30111222-0")
 
-    respuesta = _generar(client, oferente_id, token=token, telefono_cliente="351-6924551", email_cliente=_nuevo_correo())
+    respuesta = _generar(client, oferente_id, token=token, **telefono_cliente_partido("351-6924551"), email_cliente=_nuevo_correo())
 
     assert respuesta.status_code == 201, respuesta.text
     assert respuesta.json()["origen"] == "Ambos"
@@ -110,9 +110,9 @@ def test_no_se_puede_calificar_con_el_correo_propio(client, db_session):
 def test_no_se_puede_calificar_con_el_telefono_propio(client, db_session):
     token, oferente_id = crear_oferente_completo(client, db_session, email="mi.tel@test.com", dni_cuit="20-30111222-0")
 
-    respuesta = _generar(client, oferente_id, token=token, telefono_cliente="3564-400000")
+    respuesta = _generar(client, oferente_id, token=token, **telefono_cliente_partido("3564-400000"))
 
-    assert _codigos(respuesta) == {"telefono_cliente": "contacto_propio"}
+    assert _codigos(respuesta) == {"telefono_cliente_numero": "contacto_propio"}
 
 
 # --- Idempotencia y límites anti-spam ---------------------------------------
@@ -193,7 +193,7 @@ def test_la_respuesta_de_la_reseña_no_expone_contacto(client, db_session):
 
     assert respuesta.status_code == 201, respuesta.text
     assert "email_cliente" not in respuesta.json()
-    assert "telefono_cliente" not in respuesta.json()
+    assert "telefono_cliente_numero" not in respuesta.json()
 
 
 # --- Notificación: texto literal de QA (A34) --------------------------------
@@ -201,7 +201,7 @@ def test_la_respuesta_de_la_reseña_no_expone_contacto(client, db_session):
 
 def test_notificacion_con_telefono_usa_el_texto_literal(client, db_session):
     token, oferente_id = crear_oferente_completo(client, db_session, email="lit.tel@test.com", dni_cuit="20-30111222-0")
-    _dejar_resena(client, oferente_id, token=token, telefono_cliente="351-6924551")
+    _dejar_resena(client, oferente_id, token=token, **telefono_cliente_partido("351-6924551"))
 
     mensaje = db_session.query(Notificacion).one().mensaje
 

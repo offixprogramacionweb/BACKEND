@@ -112,7 +112,6 @@ def test_body_vacio_devuelve_todos_los_obligatorios_juntos(client, db_session):
     codigos = _codigos(respuesta)
     assert codigos == {
         "nombre": "requerido",
-        "apellido": "requerido",
         "dni_cuit": "requerido",
         "telefono_codigo_area": "requerido",
         "telefono_numero": "requerido",
@@ -149,17 +148,20 @@ def test_dni_de_7_digitos_es_valido(client, db_session):
 @pytest.mark.parametrize(
     ("codigo_area", "numero", "campo"),
     [
-        # 0 inicial, +54, letras o largo de característica fuera de 3-4 dígitos.
+        # 0 inicial, +54, letras o característica de 1 o más de 4 dígitos.
         ("0351", "4400888", "telefono_codigo_area"),
         ("+54351", "6924551", "telefono_codigo_area"),
         ("35a4", "692455", "telefono_codigo_area"),
-        ("35", "6924551", "telefono_codigo_area"),
-        # Número fuera de 6-7 dígitos.
+        ("3", "6924551", "telefono_codigo_area"),
+        ("35645", "6924551", "telefono_codigo_area"),
+        # Número fuera de 6-8 dígitos.
         ("351", "156924551", "telefono_numero"),
         ("3564", "40011", "telefono_numero"),
         ("3564", "4A0111", "telefono_numero"),
+        ("3564", "400111111", "telefono_numero"),
         # Cada parte bien por separado, pero el total no es de 10 dígitos.
         ("3564", "4001111", "telefono_numero"),
+        ("35", "6924551", "telefono_numero"),
     ],
 )
 def test_telefono_partido_invalido_marca_el_campo(client, db_session, codigo_area, numero, campo):
@@ -173,6 +175,20 @@ def test_telefono_partido_invalido_marca_el_campo(client, db_session, codigo_are
     )
 
     assert _codigos(respuesta) == {campo: "telefono_invalido"}
+
+
+@pytest.mark.parametrize(("codigo_area", "numero"), [("11", "55551234"), ("351", "6924551"), ("3564", "400111")])
+def test_caracteristicas_de_2_3_y_4_digitos_son_validas(client, db_session, codigo_area, numero):
+    token = registrar_y_loguear(client, f"caract-{codigo_area}@test.com")
+    categoria = crear_categoria_db(db_session, nombre=f"Caract {codigo_area}")
+
+    respuesta = client.post(
+        "/api/v1/oferentes",
+        json=formulario_registro(categoria.id_categoria, telefono_codigo_area=codigo_area, telefono_numero=numero),
+        headers=_auth(token),
+    )
+
+    assert respuesta.status_code == 201, respuesta.text
 
 
 def test_telefono_partido_valido_se_guarda_y_se_devuelve_separado(client, db_session):
@@ -506,18 +522,25 @@ def test_nombre_y_apellido_se_guardan_por_separado(client, db_session):
     assert cuerpo["apellido"] == "Alessi"
 
 
-def test_apellido_invalido_o_vacio_se_rechaza(client, db_session):
+def test_apellido_es_opcional_para_razon_social(client, db_session):
+    token = registrar_y_loguear(client, "razon@test.com")
+    categoria = crear_categoria_db(db_session, nombre="Gasista razon social")
+
+    cuerpo_sin_apellido = formulario_registro(categoria.id_categoria, nombre="Gasistas SRL")
+    del cuerpo_sin_apellido["apellido"]
+    respuesta = client.post("/api/v1/oferentes", json=cuerpo_sin_apellido, headers=_auth(token))
+
+    assert respuesta.status_code == 201, respuesta.text
+    assert respuesta.json()["apellido"] is None
+
+
+def test_apellido_con_numeros_se_rechaza(client, db_session):
     token = registrar_y_loguear(client, "apellido@test.com")
     categoria = crear_categoria_db(db_session, nombre="Plomero apellido")
 
-    cuerpo_sin_apellido = formulario_registro(categoria.id_categoria)
-    del cuerpo_sin_apellido["apellido"]
-    sin_apellido = client.post("/api/v1/oferentes", json=cuerpo_sin_apellido, headers=_auth(token))
-    assert _codigos(sin_apellido) == {"apellido": "requerido"}
-
-    con_numeros = client.post(
+    respuesta = client.post(
         "/api/v1/oferentes",
         json=formulario_registro(categoria.id_categoria, apellido="Pérez123"),
         headers=_auth(token),
     )
-    assert _codigos(con_numeros) == {"apellido": "nombre_invalido"}
+    assert _codigos(respuesta) == {"apellido": "nombre_invalido"}

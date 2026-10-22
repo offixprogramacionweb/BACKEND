@@ -34,7 +34,6 @@ from app.services.storage import url_publica
 # Campos que la edición no puede dejar en NULL: el registro los exige.
 CAMPOS_NO_NULOS = {
     "nombre",
-    "apellido",
     "telefono_codigo_area",
     "telefono_numero",
     "categoria_id",

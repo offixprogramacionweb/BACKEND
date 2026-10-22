@@ -275,7 +275,7 @@ def get_or_create_solicitud(db, oferente: Oferente, codigo: str, **datos_cliente
     solicitud = SolicitudResena(
         oferente_id=oferente.id_oferente,
         codigo_unico=codigo,
-        origen=OrigenSolicitud.desde_contacto(datos_cliente.get("telefono_cliente"), datos_cliente.get("email_cliente")),
+        origen=OrigenSolicitud.desde_contacto(datos_cliente.get("telefono_cliente_codigo_area"), datos_cliente.get("email_cliente")),
         fecha_expiracion=fecha_expiracion(),
         **datos_cliente,
     )
@@ -393,7 +393,8 @@ def run():
             oferentes[0],
             CODIGO_SOLICITUD_WHATSAPP,
             nombre_cliente="Cliente WhatsApp",
-            telefono_cliente="3516924551",
+            telefono_cliente_codigo_area="351",
+            telefono_cliente_numero="6924551",
         )
         get_or_create_resena_aceptada(db, oferentes[0])
         get_or_create_resenas_serena(db, serena)
@@ -404,7 +405,8 @@ def run():
             oferentes[1],
             "DEMO-PENDIENTE-0001",
             nombre_cliente="Gustavo Rivas",
-            telefono_cliente="3564692755",
+            telefono_cliente_codigo_area="3564",
+            telefono_cliente_numero="692755",
             email_cliente="gustavo.rivas@offix.example.com",
         )
         resena_pendiente = db.query(Resena).filter(Resena.solicitud_id == solicitud_pendiente.id_solicitud).first()

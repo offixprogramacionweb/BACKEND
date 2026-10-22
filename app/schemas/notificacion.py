@@ -23,7 +23,8 @@ class NotificacionOut(BaseModel):
                 "estado": "Pendiente",
                 "resena_id": 7,
                 "nombre_cliente": "Juan Cliente",
-                "telefono_cliente": "3516924551",
+                "telefono_cliente_codigo_area": "351",
+                "telefono_cliente_numero": "6924551",
                 "email_cliente": "juan@example.com",
                 "fecha_creacion": "2026-09-15T14:32:00Z",
                 "fecha_resolucion": None,
@@ -39,7 +40,8 @@ class NotificacionOut(BaseModel):
     resena_id: int | None = None
 
     nombre_cliente: str | None = Field(default=None, description="Solo en las notificaciones de reseña.")
-    telefono_cliente: str | None = None
+    telefono_cliente_codigo_area: str | None = None
+    telefono_cliente_numero: str | None = None
     email_cliente: str | None = None
 
     validacion_matricula_id: int | None = Field(default=None, description="Solo en las notificaciones de matrícula.")

@@ -15,6 +15,7 @@ from app.models import (  # noqa: F401
     resena,
     solicitud_resena,
     trabajo_realizado,
+    ubicacion,
     usuario,
 )
 from app.core.errores import registrar_manejadores

@@ -13,7 +13,7 @@ from pathlib import Path
 from app.core.config import settings
 from app.core.security import hash_password
 from app.db.database import SessionLocal, preparar_esquema
-from app.models import alerta_admin, archivo_adjunto, emision_resena, oferente_dia_atencion, trabajo_realizado  # noqa: F401 — registran sus mappers
+from app.models import alerta_admin, archivo_adjunto, emision_resena, oferente_dia_atencion, trabajo_realizado, ubicacion  # noqa: F401 — registran sus mappers
 from app.models.categoria import Categoria
 from app.models.matricula import PadronMatricula, TipoProfesionalMatricula
 from app.models.notificacion import Notificacion
@@ -24,6 +24,12 @@ from app.models.solicitud_resena import EstadoSolicitud, OrigenSolicitud, Solici
 from app.models.usuario import RolUsuario, Usuario
 from app.services.notificaciones import crear_notificacion_resena_nueva
 from app.services.padrones import parsear_padron_json, parsear_padron_md
+from app.services.ubicaciones import sembrar_ubicaciones
+
+# Códigos INDEC de las localidades de la demo (ver app/db/ubicaciones.json).
+SAN_FRANCISCO_CBA = "14140360"
+FREYRE_CBA = "14140220"
+FRONTERA_SF = "82021200"  # Santa Fe: sirve para probar el filtro por provincia.
 
 PADRONES_DIR = Path(__file__).parent / "padrones"
 
@@ -85,6 +91,7 @@ OFERENTES_DEMO = [
         telefono_codigo_area="3564",
         telefono_numero="400333",
         estado_verificacion=EstadoVerificacion.PENDIENTE,
+        localidad=FRONTERA_SF,
     ),
     dict(
         email="lucia.rodriguez@offix.example.com",
@@ -108,6 +115,7 @@ OFERENTES_DEMO = [
         telefono_codigo_area="3564",
         telefono_numero="400555",
         estado_verificacion=EstadoVerificacion.PENDIENTE,
+        localidad=FREYRE_CBA,
     ),
     dict(
         email="ana.torres@offix.example.com",
@@ -229,6 +237,8 @@ def _completar_registro(db, oferente: Oferente, datos: dict) -> None:
     oferente.info_guardia = datos.get("info_guardia") if oferente.disponible_emergencia else None
     oferente.hora_inicio_atencion = oferente.hora_inicio_atencion or time(8, 0)
     oferente.hora_fin_atencion = oferente.hora_fin_atencion or time(18, 0)
+    # Como los días: no pisa una localidad que se haya cargado desde la app.
+    oferente.localidad_id = oferente.localidad_id or datos.get("localidad", SAN_FRANCISCO_CBA)
     _asegurar_dias(db, oferente, datos.get("dias", LUNES_A_VIERNES))
 
 
@@ -383,6 +393,7 @@ def run():
     preparar_esquema()
     db = SessionLocal()
     try:
+        localidades_cargadas = sembrar_ubicaciones(db)
         categorias = {nombre: get_or_create_categoria(db, nombre, descripcion) for nombre, descripcion in CATEGORIAS}
 
         oferentes = [get_or_create_oferente(db, categorias, datos) for datos in OFERENTES_DEMO]
@@ -444,6 +455,7 @@ def run():
 
         db.commit()
         print(f"Datos de prueba cargados/verificados correctamente ({len(categorias)} categorías, {len(oferentes)} oferentes).")
+        print(f"Provincias y localidades del INDEC: {localidades_cargadas} localidades nuevas (0 = ya estaban cargadas).")
         print(f"Usuario admin: admin@offix.example.com / password: {PASSWORD_SEED}")
         print(f"Oferentes de ejemplo: password para todos: {PASSWORD_SEED}")
         print(f"Caso de QA (CA01): {EMAIL_SIN_REGISTRO} tiene rol Oferente y todavía no completó el registro.")

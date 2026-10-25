@@ -64,6 +64,18 @@ Endpoints nuevos o modificados de Sprint 2:
 | `POST /api/v1/oferentes/{id}/solicitudes-resena` | Auth opcional: anónimo solo correo; el Profesional dueño, teléfono o correo. Límites anti-spam (el reenvío del mismo enlace también cuenta): 429 `limite_solicitudes` |
 | `GET /api/v1/oferentes/{id}/resenas` | Opiniones públicas paginadas (`pagina`, `por_pagina` de 1 a 10, por defecto 5; respuesta con `items`, `total`, `paginas`): `cliente` = "Juan C.", sin contacto |
 
+## Directorio de profesionales: búsqueda, filtros y zonas
+
+| Método y ruta | Descripción |
+|---|---|
+| `GET /api/v1/oferentes` | Directorio público paginado. `q` busca en nombre, apellido, oficio (categoría o especialidad), número de matrícula y localidad. Filtros combinables: `categoria_id`, `provincia_id`, `localidad_id`, `matriculado=true` (Solo Matriculados), `urgencias=true` (Disponible Hoy / Urgencias). Sin coincidencias: `items: []` y `total: 0` |
+| `GET /api/v1/catalogos/provincias` | Las 24 provincias (códigos INDEC). Con `solo_con_profesionales=true`, solo las que tienen profesionales activos |
+| `GET /api/v1/catalogos/provincias/{id}/localidades` | Localidades de la provincia, con `departamento` para distinguir nombres repetidos. `q` para autocompletar y `solo_con_profesionales=true` para el desplegable "Zona". 404 `provincia_inexistente` |
+
+- El alta (`POST /api/v1/oferentes`) y la edición (`PUT /api/v1/oferentes/me`) aceptan `localidad_id`, que por ahora es **opcional**. Si no existe, la respuesta es 422 `localidad_invalida`. En la edición, `null` la borra.
+- El perfil público trae `localidad` (`id`, `nombre`, `departamento`) y `provincia` (`id`, `nombre`), o `null` si no la cargó. Ya no trae `latitud`, `longitud` ni `radio_cobertura_km`.
+- El catálogo sale de `app/db/ubicaciones.json`, generado desde la API Georef del INDEC con `python -m app.scripts.generar_ubicaciones`.
+
 ## Notas de alcance (Sprint 1, revisión 4)
 
 - El logout es stateless (no hay revocación real de tokens del lado del servidor).

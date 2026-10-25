@@ -40,9 +40,10 @@ class Oferente(Base):
     # Código del catálogo de experiencia (MENOS_1, 1_A_2, ...). Ver app/core/catalogos.py.
     experiencia = Column(String(20), nullable=True)
 
-    latitud = Column(Numeric(10, 8), nullable=True)
-    longitud = Column(Numeric(11, 8), nullable=True)
-    radio_cobertura_km = Column(Numeric(5, 2), nullable=True)
+    # Zona del directorio: localidad del catálogo oficial (la provincia sale de
+    # ahí). Opcional por ahora, hasta que el formulario del frontend la envíe.
+    # Reemplaza a latitud, longitud y radio_cobertura_km, que nunca se cargaban.
+    localidad_id = Column(String(8), ForeignKey("localidades.id_localidad"), nullable=True, index=True)
 
     # Obligatorios para los registros nuevos (los impone el schema). Quedan
     # nullable en la base porque las filas anteriores a Sprint 2 pueden no tenerlos.
@@ -57,6 +58,7 @@ class Oferente(Base):
 
     usuario = relationship("Usuario", back_populates="oferente")
     categoria = relationship("Categoria", back_populates="oferentes")
+    localidad = relationship("Localidad")
     dias_atencion = relationship(
         "OferenteDiaAtencion",
         back_populates="oferente",

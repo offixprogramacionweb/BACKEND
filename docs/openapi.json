@@ -296,13 +296,143 @@
         }
       }
     },
+    "/api/v1/catalogos/provincias": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Listar provincias (público)",
+        "description": "Catálogo oficial del INDEC, ordenado por nombre.",
+        "operationId": "listar_provincias_api_v1_catalogos_provincias_get",
+        "parameters": [
+          {
+            "name": "solo_con_profesionales",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: solo las zonas con profesionales activos (desplegable \"Zona\" del directorio). false: el catálogo completo (formulario de alta).",
+              "default": false,
+              "title": "Solo Con Profesionales"
+            },
+            "description": "true: solo las zonas con profesionales activos (desplegable \"Zona\" del directorio). false: el catálogo completo (formulario de alta)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ProvinciaOut"
+                  },
+                  "title": "Response Listar Provincias Api V1 Catalogos Provincias Get"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/catalogos/provincias/{provincia_id}/localidades": {
+      "get": {
+        "tags": [
+          "Catálogos"
+        ],
+        "summary": "Listar las localidades de una provincia (público)",
+        "description": "Ordenadas por nombre. Algunas provincias tienen localidades con el mismo\nnombre: el `departamento` sirve para distinguirlas en el desplegable.",
+        "operationId": "listar_localidades_api_v1_catalogos_provincias__provincia_id__localidades_get",
+        "parameters": [
+          {
+            "name": "provincia_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "title": "Provincia Id"
+            }
+          },
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Parte del nombre de la localidad, para autocompletar.",
+              "title": "Q"
+            },
+            "description": "Parte del nombre de la localidad, para autocompletar."
+          },
+          {
+            "name": "solo_con_profesionales",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: solo las zonas con profesionales activos (desplegable \"Zona\" del directorio). false: el catálogo completo (formulario de alta).",
+              "default": false,
+              "title": "Solo Con Profesionales"
+            },
+            "description": "true: solo las zonas con profesionales activos (desplegable \"Zona\" del directorio). false: el catálogo completo (formulario de alta)."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/LocalidadOut"
+                  },
+                  "title": "Response Listar Localidades Api V1 Catalogos Provincias  Provincia Id  Localidades Get"
+                }
+              }
+            }
+          },
+          "404": {
+            "description": "La provincia no existe (`provincia_inexistente`)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/oferentes": {
       "get": {
         "tags": [
           "Oferentes"
         ],
         "summary": "Buscar profesionales (público, paginado)",
-        "description": "RF7/RF8 — Búsqueda pública paginada. Excluye las cuentas suspendidas o\nbloqueadas (observación F4 de QA): un Profesional suspendido no aparece.\nUna página fuera de rango devuelve `items` vacío con el `total` real.",
+        "description": "RF7/RF8 — Directorio público paginado. Todos los filtros se combinan.\nExcluye las cuentas suspendidas o bloqueadas (observación F4 de QA).\nSin coincidencias (o con una provincia/localidad inexistente) devuelve\n`items` vacío y `total` 0. Una página fuera de rango devuelve `items`\nvacío con el `total` real.",
         "operationId": "buscar_oferentes_api_v1_oferentes_get",
         "parameters": [
           {
@@ -318,10 +448,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Palabra clave: parte del nombre o del apellido",
+              "description": "Texto libre: parte del nombre, apellido, oficio (categoría o especialidad), número de matrícula o localidad.",
               "title": "Q"
             },
-            "description": "Palabra clave: parte del nombre o del apellido"
+            "description": "Texto libre: parte del nombre, apellido, oficio (categoría o especialidad), número de matrícula o localidad."
           },
           {
             "name": "categoria_id",
@@ -336,10 +466,70 @@
                   "type": "null"
                 }
               ],
-              "description": "Filtrar por categoría/oficio",
+              "description": "Filtrar por categoría/oficio. Sin valor: todos los oficios.",
               "title": "Categoria Id"
             },
-            "description": "Filtrar por categoría/oficio"
+            "description": "Filtrar por categoría/oficio. Sin valor: todos los oficios."
+          },
+          {
+            "name": "provincia_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Código INDEC de la provincia. Sin valor: todas.",
+              "title": "Provincia Id"
+            },
+            "description": "Código INDEC de la provincia. Sin valor: todas."
+          },
+          {
+            "name": "localidad_id",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Código INDEC de la localidad. Sin valor: todas las zonas.",
+              "title": "Localidad Id"
+            },
+            "description": "Código INDEC de la localidad. Sin valor: todas las zonas."
+          },
+          {
+            "name": "matriculado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Solo Matriculados: con al menos una matrícula fidelizada.",
+              "default": false,
+              "title": "Matriculado"
+            },
+            "description": "Solo Matriculados: con al menos una matrícula fidelizada."
+          },
+          {
+            "name": "urgencias",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "Disponible Hoy / Urgencias: solo quienes atienden emergencias.",
+              "default": false,
+              "title": "Urgencias"
+            },
+            "description": "Disponible Hoy / Urgencias: solo quienes atienden emergencias."
           },
           {
             "name": "pagina",
@@ -2753,6 +2943,54 @@
         ],
         "title": "LimitesCatalogo"
       },
+      "LocalidadOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Código INDEC de la localidad. Es lo que se envía como `localidad_id`."
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "departamento": {
+            "type": "string",
+            "title": "Departamento",
+            "description": "Para distinguir localidades con el mismo nombre en una provincia."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "departamento"
+        ],
+        "title": "LocalidadOut"
+      },
+      "LocalidadRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "departamento": {
+            "type": "string",
+            "title": "Departamento"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre",
+          "departamento"
+        ],
+        "title": "LocalidadRef"
+      },
       "MatriculaOut": {
         "properties": {
           "id_matricula": {
@@ -3141,6 +3379,19 @@
             ],
             "title": "Info Guardia"
           },
+          "localidad_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Localidad Id",
+            "description": "Código INDEC de la localidad (ver GET /catalogos/provincias/{id}/localidades). Opcional."
+          },
           "descripcion": {
             "anyOf": [
               {
@@ -3151,48 +3402,6 @@
               }
             ],
             "title": "Descripcion"
-          },
-          "latitud": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Latitud"
-          },
-          "longitud": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Longitud"
-          },
-          "radio_cobertura_km": {
-            "anyOf": [
-              {
-                "type": "number"
-              },
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Radio Cobertura Km"
           }
         },
         "additionalProperties": false,
@@ -3344,38 +3553,27 @@
             ],
             "title": "Descripcion"
           },
-          "latitud": {
+          "localidad": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/LocalidadRef"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Latitud"
+            "description": "Zona del profesional. null si no la cargó."
           },
-          "longitud": {
+          "provincia": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/ProvinciaRef"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Longitud"
-          },
-          "radio_cobertura_km": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Radio Cobertura Km"
+            "description": "Provincia de la localidad. null si no hay localidad."
           },
           "promedio_calificacion": {
             "type": "string",
@@ -3602,38 +3800,27 @@
             ],
             "title": "Descripcion"
           },
-          "latitud": {
+          "localidad": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/LocalidadRef"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Latitud"
+            "description": "Zona del profesional. null si no la cargó."
           },
-          "longitud": {
+          "provincia": {
             "anyOf": [
               {
-                "type": "string"
+                "$ref": "#/components/schemas/ProvinciaRef"
               },
               {
                 "type": "null"
               }
             ],
-            "title": "Longitud"
-          },
-          "radio_cobertura_km": {
-            "anyOf": [
-              {
-                "type": "string"
-              },
-              {
-                "type": "null"
-              }
-            ],
-            "title": "Radio Cobertura Km"
+            "description": "Provincia de la localidad. null si no hay localidad."
           },
           "promedio_calificacion": {
             "type": "string",
@@ -3798,6 +3985,19 @@
             ],
             "title": "Info Guardia"
           },
+          "localidad_id": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 8
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Localidad Id",
+            "description": "Código INDEC de la localidad (ver GET /catalogos/provincias/{id}/localidades). Opcional."
+          },
           "dni_cuit": {
             "type": "string",
             "title": "Dni Cuit",
@@ -3940,6 +4140,43 @@
         ],
         "title": "PerfilOut",
         "description": "HU-03 / CA02: lo único que se ve al volver del login. Nada de datos del\nperfil de Oferente — esa es otra HU."
+      },
+      "ProvinciaOut": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id",
+            "description": "Código INDEC de la provincia (\"14\" = Córdoba)."
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ProvinciaOut"
+      },
+      "ProvinciaRef": {
+        "properties": {
+          "id": {
+            "type": "string",
+            "title": "Id"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id",
+          "nombre"
+        ],
+        "title": "ProvinciaRef"
       },
       "ReemplazoResolucionIn": {
         "properties": {

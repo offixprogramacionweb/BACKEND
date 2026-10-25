@@ -27,18 +27,37 @@ RESPUESTAS_REGISTRO = {
     responses={422: {"description": "`por_pagina` distinto de 10 o 25, o `pagina` menor a 1"}},
 )
 def buscar_oferentes(
-    q: str | None = Query(default=None, description="Palabra clave: parte del nombre o del apellido"),
-    categoria_id: int | None = Query(default=None, description="Filtrar por categoría/oficio"),
+    q: str | None = Query(
+        default=None,
+        description="Texto libre: parte del nombre, apellido, oficio (categoría o especialidad), número de matrícula o localidad.",
+    ),
+    categoria_id: int | None = Query(default=None, description="Filtrar por categoría/oficio. Sin valor: todos los oficios."),
+    provincia_id: str | None = Query(default=None, description="Código INDEC de la provincia. Sin valor: todas."),
+    localidad_id: str | None = Query(default=None, description="Código INDEC de la localidad. Sin valor: todas las zonas."),
+    matriculado: bool = Query(default=False, description="Solo Matriculados: con al menos una matrícula fidelizada."),
+    urgencias: bool = Query(default=False, description="Disponible Hoy / Urgencias: solo quienes atienden emergencias."),
     pagina: int = Query(default=1, ge=1, description="Página a devolver, desde 1."),
     por_pagina: int = Query(default=10, description="Profesionales por página: 10 o 25."),
     db: Session = Depends(get_db),
 ):
-    """RF7/RF8 — Búsqueda pública paginada. Excluye las cuentas suspendidas o
-    bloqueadas (observación F4 de QA): un Profesional suspendido no aparece.
-    Una página fuera de rango devuelve `items` vacío con el `total` real."""
+    """RF7/RF8 — Directorio público paginado. Todos los filtros se combinan.
+    Excluye las cuentas suspendidas o bloqueadas (observación F4 de QA).
+    Sin coincidencias (o con una provincia/localidad inexistente) devuelve
+    `items` vacío y `total` 0. Una página fuera de rango devuelve `items`
+    vacío con el `total` real."""
     if por_pagina not in POR_PAGINA_PERMITIDOS:
         raise error_validacion("por_pagina", "invalido", "Elegí 10 o 25 profesionales por página")
-    return buscar_publicos(db, q=q, categoria_id=categoria_id, pagina=pagina, por_pagina=por_pagina)
+    return buscar_publicos(
+        db,
+        q=q,
+        categoria_id=categoria_id,
+        provincia_id=provincia_id,
+        localidad_id=localidad_id,
+        matriculado=matriculado,
+        urgencias=urgencias,
+        pagina=pagina,
+        por_pagina=por_pagina,
+    )
 
 
 @router.post(

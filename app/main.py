@@ -1,5 +1,6 @@
 from fastapi import FastAPI, status
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.middleware.gzip import GZipMiddleware
 from fastapi.responses import JSONResponse
 
 from app.core.config import settings
@@ -64,6 +65,9 @@ app = FastAPI(
     ],
 )
 
+# Comprime las respuestas de más de 1 KB si el navegador lo acepta (las localidades
+# de Córdoba pasan de 47 KB a 6 KB). Va antes que CORS: queda por dentro.
+app.add_middleware(GZipMiddleware, minimum_size=1000)
 app.add_middleware(
     CORSMiddleware,
     allow_origins=settings.cors_origins_list,

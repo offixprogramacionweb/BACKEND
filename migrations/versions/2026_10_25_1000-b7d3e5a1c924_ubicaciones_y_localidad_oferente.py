@@ -16,6 +16,7 @@ El catálogo viene de la API Georef (ver `app/scripts/generar_ubicaciones.py`).
 Si el catálogo oficial cambia, se regenera el JSON y se carga con una migración nueva.
 """
 
+import hashlib
 import json
 from pathlib import Path
 from typing import Sequence, Union
@@ -31,6 +32,20 @@ depends_on: Union[str, Sequence[str], None] = None
 
 SCHEMA = "offix"
 CATALOGO = Path(__file__).resolve().parents[2] / "app" / "db" / "ubicaciones.json"
+# Huella del JSON que carga esta migración (ver `huella_catalogo` en app/services/ubicaciones.py).
+# El backend muestra las localidades desde ese JSON en memoria y valida contra la tabla:
+# si el JSON cambia, hace falta una migración nueva, y el test de consistencia lo exige.
+CATALOGO_SHA256 = "f3367734c6c8bf3ba66ddc90e9050f2aa3c634ad64071a42f474897f8c6c1cd8"
+
+
+def _huella(datos: dict) -> str:
+    canonico = json.dumps(
+        {"provincias": datos["provincias"], "localidades": datos["localidades"]},
+        sort_keys=True,
+        ensure_ascii=False,
+        separators=(",", ":"),
+    )
+    return hashlib.sha256(canonico.encode("utf-8")).hexdigest()
 
 
 def _avisar_coordenadas_cargadas() -> None:
@@ -52,6 +67,11 @@ def _avisar_coordenadas_cargadas() -> None:
 
 def upgrade() -> None:
     catalogo = json.loads(CATALOGO.read_text(encoding="utf-8"))
+    if _huella(catalogo) != CATALOGO_SHA256:
+        raise RuntimeError(
+            "app/db/ubicaciones.json cambió después de escribir esta migración. "
+            "Los cambios del catálogo se cargan con una migración nueva."
+        )
 
     provincias = op.create_table(
         "provincias",

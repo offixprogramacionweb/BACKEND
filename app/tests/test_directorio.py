@@ -1,10 +1,12 @@
 """Directorio de profesionales: búsqueda, filtros y zonas (US Búsqueda de Profesionales, CA04-CA07)."""
 
+import importlib.util
 from datetime import date
+from pathlib import Path
 
 from app.models.matricula import Matricula
 from app.models.oferente import Oferente
-from app.services.ubicaciones import cargar_catalogo
+from app.services.ubicaciones import cargar_catalogo, huella_catalogo
 from app.tests.conftest import crear_categoria_db, crear_localidad_db, formulario_registro, registrar_y_loguear
 
 SAN_FRANCISCO = "14140360"
@@ -208,30 +210,43 @@ def test_edicion_ya_no_acepta_coordenadas(client, db_session):
     assert respuesta.json()["errores"] == [{"campo": "latitud", "codigo": "campo_no_permitido"}]
 
 
-# --- Catálogo de provincias y localidades ----------------------------------------
+# --- Catálogo de provincias y localidades (en memoria, con caché) ----------------
+# Estos tests no cargan filas en `localidades`: el catálogo sale del JSON en memoria.
 
 
-def test_catalogo_de_provincias_ordenado(client, db_session):
-    _localidades(db_session)
-    assert client.get("/api/v1/catalogos/provincias").json() == [
-        {"id": "14", "nombre": "Córdoba"},
-        {"id": "82", "nombre": "Santa Fe"},
-    ]
+def test_catalogo_de_provincias_completo_y_ordenado(client, db_session):
+    provincias = client.get("/api/v1/catalogos/provincias").json()
+
+    assert len(provincias) == 24
+    assert provincias[0] == {"id": "06", "nombre": "Buenos Aires"}
+    assert {"id": "14", "nombre": "Córdoba"} in provincias
+    # Orden sin tildes: "Córdoba" va antes que "Corrientes" (con la "ó" al final quedaría después).
+    nombres = [p["nombre"] for p in provincias]
+    assert nombres.index("Córdoba") < nombres.index("Corrientes")
 
 
-def test_localidades_de_una_provincia_con_busqueda(client, db_session):
-    _localidades(db_session)
+def test_localidades_de_una_provincia_desde_memoria(client, db_session):
     todas = client.get("/api/v1/catalogos/provincias/14/localidades").json()
-    assert [loc["nombre"] for loc in todas] == ["Freyre", "San Francisco"]
 
-    filtradas = client.get("/api/v1/catalogos/provincias/14/localidades", params={"q": "san fran"}).json()
-    assert filtradas == [{"id": SAN_FRANCISCO, "nombre": "San Francisco", "departamento": "San Justo"}]
+    assert len(todas) == 532
+    assert {"id": SAN_FRANCISCO, "nombre": "San Francisco", "departamento": "San Justo"} in todas
 
 
-def test_localidades_de_provincia_inexistente_es_404(client, db_session):
+def test_busqueda_de_localidades_sin_mayusculas_ni_tildes(client, db_session):
+    url = "/api/v1/catalogos/provincias/14/localidades"
+
+    assert SAN_FRANCISCO in {loc["id"] for loc in client.get(url, params={"q": "SAN FRAN"}).json()}
+    assert "Córdoba" in {loc["nombre"] for loc in client.get(url, params={"q": "cordoba"}).json()}
+    assert "Río Cuarto" in {loc["nombre"] for loc in client.get(url, params={"q": "rio cuarto"}).json()}
+    assert client.get(url, params={"q": "zzzz"}).json() == []
+
+
+def test_localidades_de_provincia_inexistente_es_404_sin_cache(client, db_session):
     respuesta = client.get("/api/v1/catalogos/provincias/99/localidades")
+
     assert respuesta.status_code == 404
     assert respuesta.json()["detail"]["codigo"] == "provincia_inexistente"
+    assert respuesta.headers["cache-control"] == "no-store"
 
 
 def test_solo_zonas_con_profesionales(client, db_session):
@@ -244,6 +259,25 @@ def test_solo_zonas_con_profesionales(client, db_session):
     assert [loc["id"] for loc in localidades] == [SAN_FRANCISCO]  # Freyre no tiene profesionales
 
 
+def test_catalogo_completo_se_cachea_un_dia(client, db_session):
+    for url in ("/api/v1/catalogos/provincias", "/api/v1/catalogos/provincias/14/localidades"):
+        assert client.get(url).headers["cache-control"] == "public, max-age=86400, s-maxage=86400", url
+        assert client.get(url, params={"q": "san"}).headers["cache-control"] == "public, max-age=86400, s-maxage=86400", url
+
+
+def test_zonas_con_profesionales_se_cachean_pocos_minutos(client, db_session):
+    for url in ("/api/v1/catalogos/provincias", "/api/v1/catalogos/provincias/14/localidades"):
+        respuesta = client.get(url, params={"solo_con_profesionales": True})
+        assert respuesta.headers["cache-control"] == "public, max-age=60, s-maxage=300", url
+
+
+def test_respuestas_grandes_llegan_comprimidas(client, db_session):
+    respuesta = client.get("/api/v1/catalogos/provincias/14/localidades", headers={"Accept-Encoding": "gzip"})
+
+    assert respuesta.headers["content-encoding"] == "gzip"
+    assert len(respuesta.json()) == 532  # el cliente la descomprime solo
+
+
 def test_catalogo_versionado_es_consistente():
     catalogo = cargar_catalogo()
     provincias = {p["id"] for p in catalogo["provincias"]}
@@ -253,3 +287,16 @@ def test_catalogo_versionado_es_consistente():
     assert len(ids_localidades) == len(set(ids_localidades)) > 4000
     assert all(loc["provincia_id"] in provincias for loc in catalogo["localidades"])
     assert all(len(loc["id"]) <= 8 and len(loc["nombre"]) <= 150 and len(loc["departamento"]) <= 150 for loc in catalogo["localidades"])
+
+
+def test_el_json_es_el_mismo_que_carga_la_migracion():
+    """El backend muestra el catálogo desde el JSON y valida contra la tabla, que
+    cargó la migración. Si este test falla, cambiaron el JSON: los cambios del
+    catálogo van en una migración nueva (y se actualiza la huella esperada acá)."""
+    migraciones = Path(__file__).resolve().parents[2] / "migrations" / "versions"
+    archivo = next(migraciones.glob("*-b7d3e5a1c924_*.py"))
+    spec = importlib.util.spec_from_file_location("migracion_ubicaciones", archivo)
+    migracion = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(migracion)
+
+    assert huella_catalogo() == migracion.CATALOGO_SHA256

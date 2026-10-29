@@ -302,7 +302,7 @@
           "Catálogos"
         ],
         "summary": "Listar provincias (público)",
-        "description": "Catálogo oficial del INDEC, ordenado por nombre.",
+        "description": "Catálogo oficial del INDEC, ordenado por nombre. Responde desde memoria;\nsolo `solo_con_profesionales=true` consulta la base.",
         "operationId": "listar_provincias_api_v1_catalogos_provincias_get",
         "parameters": [
           {
@@ -352,7 +352,7 @@
           "Catálogos"
         ],
         "summary": "Listar las localidades de una provincia (público)",
-        "description": "Ordenadas por nombre. Algunas provincias tienen localidades con el mismo\nnombre: el `departamento` sirve para distinguirlas en el desplegable.",
+        "description": "Ordenadas por nombre. Algunas provincias tienen localidades con el mismo\nnombre: el `departamento` sirve para distinguirlas en el desplegable.\nResponde desde memoria; solo `solo_con_profesionales=true` consulta la base.",
         "operationId": "listar_localidades_api_v1_catalogos_provincias__provincia_id__localidades_get",
         "parameters": [
           {
@@ -377,10 +377,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Parte del nombre de la localidad, para autocompletar.",
+              "description": "Parte del nombre de la localidad, para autocompletar. No distingue mayúsculas ni tildes.",
               "title": "Q"
             },
-            "description": "Parte del nombre de la localidad, para autocompletar."
+            "description": "Parte del nombre de la localidad, para autocompletar. No distingue mayúsculas ni tildes."
           },
           {
             "name": "solo_con_profesionales",

@@ -242,6 +242,30 @@ PUT /api/v1/oferentes/me
 
 ---
 
+## 6. Caché del catálogo (no requiere nada del frontend)
+
+El catálogo de provincias y localidades **no consulta la base**: el backend lo
+carga en memoria al arrancar, desde `app/db/ubicaciones.json`. Además, las
+respuestas traen un header `Cache-Control` para que el navegador y el CDN de
+Vercel guarden una copia:
+
+| Pedido | Se guarda | Consecuencia |
+| ------ | --------- | ------------ |
+| Catálogo completo (`/provincias`, `/provincias/{id}/localidades`, con o sin `q`) | 1 día | Abrir el desplegable de nuevo es instantáneo |
+| Con `solo_con_profesionales=true` | 1 minuto en el navegador, 5 en Vercel | Una zona nueva puede tardar **hasta 5 minutos** en aparecer en "Zona" |
+| Provincia inexistente (404) | No se guarda | — |
+
+- **El frontend no tiene que hacer nada:** el navegador guarda las copias solo. No
+  hace falta `localStorage` ni copiar el JSON al frontend.
+- Las respuestas grandes llegan **comprimidas con gzip** (las localidades de Córdoba
+  pasan de 47 KB a 6 KB); el navegador las descomprime solo.
+- En el catálogo, `q` **no distingue tildes**: `cordoba` encuentra "Córdoba" y
+  `rio cuarto`, "Río Cuarto". (En el buscador del directorio, sí las distingue.)
+- Para probar con datos nuevos en desarrollo, usen recarga forzada
+  (Ctrl+Shift+R) o "Disable cache" en las herramientas del navegador.
+
+---
+
 ## Errores de esta HU
 
 | Situación                                     | Respuesta                                                                  |

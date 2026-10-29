@@ -2,6 +2,7 @@ from sqlalchemy import Boolean, Column, ForeignKey, Integer, Numeric, String, Te
 from sqlalchemy.orm import relationship
 
 from app.db.database import Base
+from app.models import ubicacion  # noqa: F401 — registra Localidad para la relación `localidad`, aunque el script no la importe
 
 
 class EstadoVerificacion:

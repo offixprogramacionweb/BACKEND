@@ -13,8 +13,12 @@ Los ids son los códigos oficiales del INDEC (provincia "14" = Córdoba): no
 cambian entre corridas.
 
 El JSON se versiona en el repo: la migración y el seed lo leen de ahí, sin
-depender de la red. Volver a correr este script solo si cambia el catálogo
-oficial, y cargar los cambios con una migración nueva.
+depender de la red, y el backend lo carga en memoria para responder el catálogo.
+
+Si se vuelve a correr este script y el JSON cambia, **en el mismo PR** va una
+migración nueva que cargue los cambios a la tabla, con la huella nueva
+(`huella_catalogo()`). Si no, el desplegable mostraría localidades que la tabla
+no tiene, y el test `test_el_json_es_el_mismo_que_carga_la_migracion` falla.
 
 Uso: python -m app.scripts.generar_ubicaciones
 """

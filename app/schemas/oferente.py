@@ -64,6 +64,7 @@ class _DatosOferente(BaseModel):
     telefono_codigo_area: str | None = None
     telefono_numero: str | None = None
     categoria_id: int | None = None
+    localidad_id: int | None = None
     especialidad: TextoOpcional = Field(default=None, max_length=100)
     experiencia: TextoOpcional = None
     dias_atencion: list[int] | None = None
@@ -155,6 +156,7 @@ class OferenteRegistro(_DatosOferente):
                 "telefono_codigo_area": "3564",
                 "telefono_numero": "400111",
                 "categoria_id": 1,
+                "localidad_id": 1,
                 "especialidad": "Instalaciones domiciliarias",
                 "experiencia": "3_A_5",
                 "dias_atencion": [1, 2, 3, 4, 5],
@@ -177,6 +179,7 @@ class OferenteRegistro(_DatosOferente):
     telefono_codigo_area: str = Field(description="Característica: de 2 a 4 dígitos, sin 0 al inicio (11, 351, 3564).")
     telefono_numero: str = Field(description="Número de línea: de 6 a 8 dígitos. Característica + número suman 10.")
     categoria_id: int = Field(description="Categoría u oficio principal, activa.")
+    localidad_id: int = Field(description="Localidad donde ofrece el servicio, de la lista de localidades.")
     dias_atencion: list[int] = Field(description="Días ISO: 1 = lunes … 7 = domingo. Al menos uno.")
     hora_inicio_atencion: time = Field(description="HH:MM, minutos 00 o 30.")
     hora_fin_atencion: time = Field(description="HH:MM, minutos 00 o 30, posterior a la apertura.")
@@ -213,6 +216,12 @@ class CategoriaRef(BaseModel):
     nombre: str
 
 
+class LocalidadRef(BaseModel):
+    id_localidad: int
+    provincia: str
+    ciudad: str
+
+
 class ExperienciaRef(BaseModel):
     codigo: str
     etiqueta: str
@@ -232,6 +241,8 @@ class OferentePublicoOut(BaseModel):
     apellido: str | None = Field(default=None, description="Null en razones sociales y en perfiles anteriores a la separación.")
     categoria_id: int | None = None
     categoria: CategoriaRef | None = None
+    localidad_id: int | None = None
+    localidad: LocalidadRef | None = None
     especialidad: str | None = None
     experiencia: ExperienciaRef | None = None
     telefono_codigo_area: str

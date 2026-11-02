@@ -11,6 +11,7 @@ así que es la misma sin importar el transporte; lo único que cambia entre
 implementaciones es el método `enviar`.
 """
 
+import logging
 from dataclasses import dataclass
 from functools import lru_cache
 from urllib.parse import quote
@@ -19,6 +20,9 @@ import httpx
 
 from app.core.config import settings
 from app.services.mensajes import texto_invitacion
+
+
+logger = logging.getLogger(__name__)
 
 
 class EmailError(Exception):
@@ -103,9 +107,11 @@ class BrevoEmailService(EmailService):
         try:
             respuesta = httpx.post(self.API_URL, json=payload, headers=headers, timeout=self.timeout)
         except httpx.HTTPError as exc:
+            logger.error("No se pudo contactar a Brevo: %r", exc)
             raise EmailError(f"No se pudo contactar a Brevo: {exc}") from exc
 
         if respuesta.status_code >= 400:
+            logger.error("Brevo rechazó el envío (HTTP %s): %s", respuesta.status_code, respuesta.text)
             raise EmailError(f"Brevo rechazó el envío (HTTP {respuesta.status_code}): {respuesta.text}")
 
 

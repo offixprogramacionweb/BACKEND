@@ -26,6 +26,7 @@ def test_crear_perfil_sin_token_401(client, db_session):
             "telefono_codigo_area": "3564",
             "telefono_numero": "400000",
             "categoria_id": categoria.id_categoria,
+            "localidad_id": 1,
         },
     )
     assert response.status_code == 401
@@ -71,6 +72,7 @@ def test_crear_perfil_formato_invalido_422(client, db_session):
             "telefono_codigo_area": "3564",
             "telefono_numero": "400000",
             "categoria_id": categoria.id_categoria,
+            "localidad_id": 1,
         },
         headers={"Authorization": f"Bearer {token}"},
     )

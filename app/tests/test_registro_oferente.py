@@ -154,6 +154,7 @@ def test_body_vacio_devuelve_todos_los_obligatorios_juntos(client, db_session):
         "telefono_codigo_area": "requerido",
         "telefono_numero": "requerido",
         "categoria_id": "requerido",
+        "localidad_id": "requerido",
         "dias_atencion": "dias_requeridos",
         "hora_inicio_atencion": "requerido",
         "hora_fin_atencion": "requerido",
@@ -610,3 +611,17 @@ def test_apellido_con_numeros_se_rechaza(client, db_session):
         headers=_auth(token),
     )
     assert _codigos(respuesta) == {"apellido": "nombre_invalido"}
+
+
+def test_localidad_inexistente_422(client, db_session):
+    token = registrar_y_loguear(client, "localidad@test.com")
+    categoria = crear_categoria_db(db_session, nombre="Localidad-Categoria")
+
+    respuesta = client.post(
+        "/api/v1/oferentes",
+        json=formulario_registro(categoria.id_categoria, localidad_id=9999),
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert respuesta.status_code == 422
+    assert _codigos(respuesta) == {"localidad_id": "localidad_invalida"}

@@ -22,6 +22,7 @@ from app.models.oferente_dia_atencion import OferenteDiaAtencion
 from app.models.resena import EstadoResena, Resena
 from app.models.solicitud_resena import EstadoSolicitud, OrigenSolicitud, SolicitudResena
 from app.models.usuario import RolUsuario, Usuario
+from app.services.localidades import cargar_localidades
 from app.services.notificaciones import crear_notificacion_resena_nueva
 from app.services.padrones import parsear_padron_json, parsear_padron_md
 
@@ -384,6 +385,7 @@ def run():
     db = SessionLocal()
     try:
         categorias = {nombre: get_or_create_categoria(db, nombre, descripcion) for nombre, descripcion in CATEGORIAS}
+        localidades_nuevas = cargar_localidades(db)
 
         oferentes = [get_or_create_oferente(db, categorias, datos) for datos in OFERENTES_DEMO]
         serena = oferentes[-1]
@@ -444,6 +446,7 @@ def run():
 
         db.commit()
         print(f"Datos de prueba cargados/verificados correctamente ({len(categorias)} categorías, {len(oferentes)} oferentes).")
+        print(f"Localidades cargadas: {localidades_nuevas} nuevas (0 = ya estaban).")
         print(f"Usuario admin: admin@offix.example.com / password: {PASSWORD_SEED}")
         print(f"Oferentes de ejemplo: password para todos: {PASSWORD_SEED}")
         print(f"Caso de QA (CA01): {EMAIL_SIN_REGISTRO} tiene rol Oferente y todavía no completó el registro.")

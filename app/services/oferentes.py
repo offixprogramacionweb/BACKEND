@@ -13,6 +13,7 @@ from app.core.catalogos import ETIQUETA_EXPERIENCIA
 from app.core.errores import error_negocio, error_validacion
 from app.models.archivo_adjunto import ArchivoAdjunto, TipoArchivo
 from app.models.categoria import Categoria, EstadoCategoria
+from app.models.localidad import Localidad
 from app.models.oferente import EstadoVerificacion, Oferente
 from app.models.oferente_dia_atencion import OferenteDiaAtencion
 from app.models.resena import EstadoResena, Resena
@@ -21,6 +22,7 @@ from app.models.usuario import EstadoCuenta, RolUsuario, Usuario
 from app.schemas.oferente import (
     CategoriaRef,
     ExperienciaRef,
+    LocalidadRef,
     MatriculaRef,
     OferenteEdicion,
     OferentePrivadoOut,
@@ -37,6 +39,7 @@ CAMPOS_NO_NULOS = {
     "telefono_codigo_area",
     "telefono_numero",
     "categoria_id",
+    "localidad_id",
     "dias_atencion",
     "hora_inicio_atencion",
     "hora_fin_atencion",
@@ -74,6 +77,12 @@ def armar_publica(db: Session, oferente: Oferente) -> OferentePublicoOut:
         apellido=oferente.apellido,
         categoria_id=oferente.categoria_id,
         categoria=CategoriaRef(id_categoria=categoria.id_categoria, nombre=categoria.nombre) if categoria else None,
+        localidad_id=oferente.localidad_id,
+        localidad=(
+            LocalidadRef(id_localidad=oferente.localidad.id_localidad, provincia=oferente.localidad.provincia, ciudad=oferente.localidad.ciudad)
+            if oferente.localidad
+            else None
+        ),
         especialidad=oferente.especialidad,
         experiencia=(
             ExperienciaRef(codigo=oferente.experiencia, etiqueta=ETIQUETA_EXPERIENCIA[oferente.experiencia])
@@ -113,6 +122,11 @@ def armar_privada(db: Session, oferente: Oferente) -> OferentePrivadoOut:
     )
 
 
+def validar_localidad(db: Session, localidad_id: int) -> None:
+    if db.get(Localidad, localidad_id) is None:
+        raise error_validacion("localidad_id", "localidad_invalida", "Seleccioná una localidad de la lista")
+
+
 def validar_categoria(db: Session, categoria_id: int) -> None:
     categoria = db.get(Categoria, categoria_id)
     if categoria is None or categoria.estado != EstadoCategoria.ACTIVA:
@@ -137,6 +151,7 @@ def crear_oferente(db: Session, usuario: Usuario, datos: OferenteRegistro) -> Of
         raise error_negocio(409, "perfil_existente", "Ya completaste el registro de Profesional")
 
     validar_categoria(db, datos.categoria_id)
+    validar_localidad(db, datos.localidad_id)
     if db.query(Oferente.id_oferente).filter(Oferente.dni_cuit == datos.dni_cuit).first():
         raise error_negocio(409, "dni_cuit_duplicado", "Ese DNI/CUIT ya está registrado")
 
@@ -148,6 +163,7 @@ def crear_oferente(db: Session, usuario: Usuario, datos: OferenteRegistro) -> Of
         telefono_codigo_area=datos.telefono_codigo_area,
         telefono_numero=datos.telefono_numero,
         categoria_id=datos.categoria_id,
+        localidad_id=datos.localidad_id,
         especialidad=datos.especialidad,
         experiencia=datos.experiencia,
         hora_inicio_atencion=datos.hora_inicio_atencion,
@@ -199,6 +215,8 @@ def aplicar_edicion(db: Session, oferente: Oferente, datos: OferenteEdicion) -> 
 
     if "categoria_id" in cambios:
         validar_categoria(db, cambios["categoria_id"])
+    if "localidad_id" in cambios:
+        validar_localidad(db, cambios["localidad_id"])
 
     inicio = cambios.get("hora_inicio_atencion", oferente.hora_inicio_atencion)
     fin = cambios.get("hora_fin_atencion", oferente.hora_fin_atencion)

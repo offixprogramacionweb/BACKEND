@@ -1,4 +1,6 @@
-from fastapi import FastAPI, status
+import logging
+
+from fastapi import FastAPI, Request, status
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
@@ -8,6 +10,7 @@ from app.models import (  # noqa: F401
     alerta_admin,
     archivo_adjunto,
     categoria,
+    localidad,
     matricula,
     notificacion,
     oferente,
@@ -62,6 +65,25 @@ app = FastAPI(
         {"url": "http://localhost:8000", "description": "Entorno local (iniciar_backend.bat)"},
     ],
 )
+
+logger = logging.getLogger(__name__)
+
+
+@app.middleware("http")
+async def responder_errores_inesperados(request: Request, call_next):
+    """Un error no controlado lo responde ServerErrorMiddleware, que está por fuera
+    del CORS: el navegador recibe un 500 sin cabeceras CORS y lo muestra como "no se
+    pudo conectar con el servidor", sin dejar ver el error real. Capturarlo acá, por
+    dentro del CORS, hace que el frontend reciba un 500 legible."""
+    try:
+        return await call_next(request)
+    except Exception:
+        logger.exception("Error no controlado en %s %s", request.method, request.url.path)
+        return JSONResponse(
+            status_code=status.HTTP_500_INTERNAL_SERVER_ERROR,
+            content={"detail": {"codigo": "error_interno", "mensaje": "Ocurrió un error inesperado. Intentá nuevamente."}},
+        )
+
 
 app.add_middleware(
     CORSMiddleware,

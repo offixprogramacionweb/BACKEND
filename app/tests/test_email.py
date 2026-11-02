@@ -121,3 +121,38 @@ def test_la_suite_usa_el_doble_y_no_manda_correo_real(client, emails):
 
     assert client.app.dependency_overrides[get_email_service]() is emails
     assert isinstance(emails, EmailServiceFake)
+
+
+# --- Errores de Brevo --------------------------------------------------------
+
+
+def test_brevo_rechazado_se_loguea_y_levanta_email_error(monkeypatch, caplog):
+    monkeypatch.setattr(httpx, "post", lambda *a, **k: RespuestaFalsa(400, '{"message":"sender not valid"}'))
+    servicio = BrevoEmailService(api_key="k", sender_email="a@b.com", sender_name="Offix")
+
+    with caplog.at_level("ERROR"), pytest.raises(EmailError):
+        servicio.enviar("c@test.com", "C", "Asunto", "<p>hola</p>")
+
+    assert "sender not valid" in caplog.text
+
+
+def test_un_error_inesperado_responde_500_con_cabeceras_cors(client, db_session, monkeypatch):
+    from app.routers import resenas
+    from app.tests.conftest import crear_oferente_completo
+
+    _, oferente_id = crear_oferente_completo(client, db_session)
+
+    def romper(*args, **kwargs):
+        raise RuntimeError("falla de prueba")
+
+    monkeypatch.setattr(resenas, "_verificar_limites", romper)
+    origen = settings.cors_origins_list[0]
+    respuesta = client.post(
+        f"/api/v1/oferentes/{oferente_id}/solicitudes-resena",
+        json={"nombre_cliente": "Ana", "email_cliente": "ana@test.com"},
+        headers={"Origin": origen},
+    )
+
+    assert respuesta.status_code == 500
+    assert respuesta.headers["access-control-allow-origin"] == origen
+    assert respuesta.json()["detail"]["codigo"] == "error_interno"

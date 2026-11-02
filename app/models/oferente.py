@@ -21,6 +21,9 @@ class Oferente(Base):
     # Usuario con rol Oferente y sin esta fila todavía no confirmo el formulario.
     id_oferente = Column(Integer, ForeignKey("usuarios.id_usuario", ondelete="CASCADE"), primary_key=True)
     categoria_id = Column(Integer, ForeignKey("categorias.id_categoria"), nullable=True)
+    # Localidad donde ofrece el servicio. Nullable en la base solo por las filas
+    # anteriores a este cambio; el registro la exige.
+    localidad_id = Column(Integer, ForeignKey("localidades.id_localidad"), nullable=True, index=True)
 
     # Nombre (o nombres) y apellido (o apellidos) por separado. Para una razón
     # social, el nombre va en `nombre`. El apellido queda nullable en la base
@@ -57,6 +60,7 @@ class Oferente(Base):
 
     usuario = relationship("Usuario", back_populates="oferente")
     categoria = relationship("Categoria", back_populates="oferentes")
+    localidad = relationship("Localidad")
     dias_atencion = relationship(
         "OferenteDiaAtencion",
         back_populates="oferente",

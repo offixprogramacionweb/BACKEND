@@ -17,6 +17,7 @@ from app.core.security import hash_password  # noqa: E402
 from app.db.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.categoria import Categoria  # noqa: E402
+from app.models.localidad import Localidad  # noqa: E402
 from app.models.usuario import RolUsuario, Usuario  # noqa: E402
 from app.services.auth0 import Auth0ServiceFake, get_auth0_service  # noqa: E402
 from app.services.email import EmailServiceFake, get_email_service  # noqa: E402
@@ -41,6 +42,13 @@ def db_session():
     finally:
         session.close()
         Base.metadata.drop_all(bind=engine)
+
+
+@pytest.fixture(autouse=True)
+def localidad_de_prueba(db_session):
+    """Toda alta de Oferente exige una localidad existente (id 1 en la base de prueba)."""
+    db_session.add(Localidad(provincia="Santa Fe", ciudad="Rosario"))
+    db_session.commit()
 
 
 @pytest.fixture(autouse=True)
@@ -133,6 +141,11 @@ def crear_admin_db(db_session, email: str = "admin@test.com") -> Usuario:
     return admin
 
 
+# La localidad de prueba que crea la fixture autouse de abajo tiene id 1 (la base se
+# recrea en cada test).
+LOCALIDAD_DE_PRUEBA_ID = 1
+
+
 def formulario_registro(categoria_id: int, dni_cuit: str = "20-11111111-2", nombre: str = "Oferente", **extra) -> dict:
     """Body válido de POST /api/v1/oferentes. `extra` pisa campos puntuales."""
     cuerpo = {
@@ -142,6 +155,7 @@ def formulario_registro(categoria_id: int, dni_cuit: str = "20-11111111-2", nomb
         "telefono_codigo_area": "3564",
         "telefono_numero": "400000",
         "categoria_id": categoria_id,
+        "localidad_id": LOCALIDAD_DE_PRUEBA_ID,
         "dias_atencion": [1, 2, 3, 4, 5],
         "hora_inicio_atencion": "08:00",
         "hora_fin_atencion": "18:00",

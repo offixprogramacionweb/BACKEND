@@ -5,6 +5,8 @@ comparten casi todo, y la regla de "qué ve cada uno" (D7) tiene que estar en un
 único lugar.
 """
 
+import re
+
 from sqlalchemy import func, or_
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -236,6 +238,19 @@ def aplicar_edicion(db: Session, oferente: Oferente, datos: OferenteEdicion) -> 
     return oferente
 
 
+# Separadores con los que suele aparecer una matrícula en las webs de los
+# colegios y entes ("1.000.008.919", "1000-008919"). En la base van solo dígitos.
+SEPARADORES_MATRICULA = re.compile(r"[\s.\-/]")
+SOLO_DIGITOS = re.compile(r"[0-9]+")
+
+
+def numero_de_matricula(texto: str) -> str | None:
+    """Si el texto del buscador es un número de matrícula (con o sin
+    separadores), lo devuelve solo con dígitos. Si tiene letras, no lo es."""
+    numero = SEPARADORES_MATRICULA.sub("", texto)
+    return numero if SOLO_DIGITOS.fullmatch(numero) else None
+
+
 def buscar_publicos(
     db: Session,
     *,
@@ -276,16 +291,20 @@ def buscar_publicos(
     q = (q or "").strip()
     if q:
         like = f"%{q}%"
-        query = query.filter(
-            or_(
-                Oferente.nombre.ilike(like),
-                Oferente.apellido.ilike(like),
-                Categoria.nombre.ilike(like),
-                Oferente.especialidad.ilike(like),
-                Localidad.nombre.ilike(like),
-                Oferente.matriculas.any(Matricula.numero_matricula.ilike(like)),
-            )
-        )
+        coincidencias = [
+            Oferente.nombre.ilike(like),
+            Oferente.apellido.ilike(like),
+            Categoria.nombre.ilike(like),
+            Oferente.especialidad.ilike(like),
+            Localidad.nombre.ilike(like),
+        ]
+        # La matrícula se compara completa y no por partes: muchas comparten
+        # prefijo (1000008919, 1000004305) y el caso de QA pide "solo el
+        # profesional con esa matrícula". Solo cuentan las fidelizadas.
+        numero = numero_de_matricula(q)
+        if numero:
+            coincidencias.append(Oferente.matriculas.any(Matricula.numero_matricula == numero))
+        query = query.filter(or_(*coincidencias))
 
     total = query.count()
     perfiles = query.order_by(Oferente.id_oferente).offset((pagina - 1) * por_pagina).limit(por_pagina).all()

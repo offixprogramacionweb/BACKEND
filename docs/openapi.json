@@ -448,10 +448,10 @@
                   "type": "null"
                 }
               ],
-              "description": "Texto libre: parte del nombre, apellido, oficio (categoría o especialidad), número de matrícula o localidad.",
+              "description": "Texto libre: parte del nombre, apellido, oficio (categoría o especialidad) o localidad, o el número de matrícula completo (se ignoran puntos, espacios y guiones).",
               "title": "Q"
             },
-            "description": "Texto libre: parte del nombre, apellido, oficio (categoría o especialidad), número de matrícula o localidad."
+            "description": "Texto libre: parte del nombre, apellido, oficio (categoría o especialidad) o localidad, o el número de matrícula completo (se ignoran puntos, espacios y guiones)."
           },
           {
             "name": "categoria_id",

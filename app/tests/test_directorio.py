@@ -88,6 +88,24 @@ def test_q_busca_por_numero_de_matricula(client, db_session):
     assert _ids(client, q="1000008919") == {ids["maria"]}
 
 
+def test_q_matricula_parcial_no_trae_a_nadie(client, db_session):
+    # Las dos matrículas empiezan con 100000: con coincidencia parcial traía a ambos.
+    _directorio(client, db_session)
+    assert _ids(client, q="100000") == set()
+    assert _ids(client, q="10000089") == set()
+
+
+def test_q_matricula_con_separadores(client, db_session):
+    ids = _directorio(client, db_session)
+    for texto in ("1.000.008.919", "1000-008919", " 1000 008 919 ", "1000/008919"):
+        assert _ids(client, q=texto) == {ids["maria"]}, texto
+
+
+def test_q_con_letras_no_se_toma_como_matricula(client, db_session):
+    _directorio(client, db_session)
+    assert _ids(client, q="MP1000008919") == set()
+
+
 def test_q_busca_por_localidad(client, db_session):
     ids = _directorio(client, db_session)
     assert _ids(client, q="frontera") == {ids["carlos"]}

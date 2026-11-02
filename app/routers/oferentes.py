@@ -29,7 +29,8 @@ RESPUESTAS_REGISTRO = {
 def buscar_oferentes(
     q: str | None = Query(
         default=None,
-        description="Texto libre: parte del nombre, apellido, oficio (categoría o especialidad), número de matrícula o localidad.",
+        description="Texto libre: parte del nombre, apellido, oficio (categoría o especialidad) o localidad, "
+        "o el número de matrícula completo (se ignoran puntos, espacios y guiones).",
     ),
     categoria_id: int | None = Query(default=None, description="Filtrar por categoría/oficio. Sin valor: todos los oficios."),
     provincia_id: str | None = Query(default=None, description="Código INDEC de la provincia. Sin valor: todas."),

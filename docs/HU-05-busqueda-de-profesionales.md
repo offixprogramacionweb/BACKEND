@@ -48,12 +48,18 @@ los profesionales activos.
 | Paginador                  | `pagina`       | Desde 1                                        | `1`                   |
 | Tamaño de página           | `por_pagina`   | **Solo `10` o `25`** (otro valor → 422)        | `10`                  |
 
-**Qué busca `q`** (sin distinguir mayúsculas, por coincidencia parcial):
+**Qué busca `q`** (sin distinguir mayúsculas):
 
-- Nombre o apellido: `"lucía"`, `"rodrí"`
-- Oficio, en la categoría o en la especialidad: `"electricista"`, `"tableros"`
-- Número de matrícula: `"1000008919"`
-- Localidad: `"san francisco"`
+- Por coincidencia parcial:
+  - Nombre o apellido: `"lucía"`, `"rodrí"`
+  - Oficio, en la categoría o en la especialidad: `"electricista"`, `"tableros"`
+  - Localidad: `"san francisco"`
+- Número de matrícula, **solo completo**: `"1000008919"`. Se ignoran puntos,
+  espacios, guiones y barras, así que también sirve copiado de la web del
+  padrón (`"1.000.008.919"`, `"1000-008919"`). Un número incompleto
+  (`"100000"`) no trae a nadie: muchas matrículas comparten el comienzo, y el
+  caso de QA pide "solo el profesional con esa matrícula". Solo se encuentran
+  las matrículas fidelizadas (`tiene_matricula_validada: true`).
 
 > `q` **sí distingue tildes**: `"cordoba"` no encuentra "Córdoba". El placeholder
 > del buscador puede quedar como está en el diseño.

@@ -71,6 +71,11 @@ class _DatosOferente(BaseModel):
     hora_fin_atencion: time | None = None
     disponible_emergencia: bool | None = None
     info_guardia: TextoOpcional = Field(default=None, max_length=200)
+    localidad_id: TextoOpcional = Field(
+        default=None,
+        max_length=8,
+        description="Código INDEC de la localidad (ver GET /catalogos/provincias/{id}/localidades). Opcional.",
+    )
 
     @model_validator(mode="before")
     @classmethod
@@ -200,9 +205,6 @@ class OferenteEdicion(_DatosOferente):
     DNI/CUIT: ese dato no se cambia después del registro."""
 
     descripcion: TextoOpcional = None
-    latitud: Decimal | None = None
-    longitud: Decimal | None = None
-    radio_cobertura_km: Decimal | None = None
 
 
 # --- Salidas ----------------------------------------------------------------
@@ -216,6 +218,17 @@ class CategoriaRef(BaseModel):
 class ExperienciaRef(BaseModel):
     codigo: str
     etiqueta: str
+
+
+class ProvinciaRef(BaseModel):
+    id: str
+    nombre: str
+
+
+class LocalidadRef(BaseModel):
+    id: str
+    nombre: str
+    departamento: str
 
 
 class MatriculaRef(BaseModel):
@@ -247,9 +260,8 @@ class OferentePublicoOut(BaseModel):
     disponible_emergencia: bool
     info_guardia: str | None = None
     descripcion: str | None = None
-    latitud: Decimal | None = None
-    longitud: Decimal | None = None
-    radio_cobertura_km: Decimal | None = None
+    localidad: LocalidadRef | None = Field(default=None, description="Zona del profesional. null si no la cargó.")
+    provincia: ProvinciaRef | None = Field(default=None, description="Provincia de la localidad. null si no hay localidad.")
     promedio_calificacion: Decimal
     cantidad_resenas: int = Field(description="Reseñas aceptadas. Es el contador de la pestaña Opiniones.")
     cantidad_trabajos: int = Field(description="Trabajos realizados cargados. Con 5, el frontend oculta el alta.")

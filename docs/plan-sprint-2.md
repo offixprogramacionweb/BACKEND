@@ -227,7 +227,9 @@ frontend** a partir del `codigo` (D10).
   `numero_matricula` o `estado_verificacion`) da 422. Hoy `OferenteCreate` deja
   que el propio usuario se cargue `numero_matricula`, y eso pertenece a HU-02.
 - `latitud`, `longitud` y `radio_cobertura_km` **salen del formulario de
-  registro** (no están en los casos de prueba). Las columnas quedan.
+  registro** (no están en los casos de prueba). **Actualización:** la migración
+  `b7d3e5a1c924` borró las columnas y las reemplazó por `localidad_id`
+  (catálogo del INDEC), opcional, para el filtro por zona del directorio.
 
 ### Formato de los errores (D10)
 
@@ -325,7 +327,7 @@ Se separa la salida en dos:
 | `tiene_matricula_validada` + matrículas (tipo y número, para el tooltip "Matriculado N° X") | ✔ | ✔ |
 | **`dni_cuit`** | ✘ | ✔ |
 | `estado_verificacion`, `cantidad_rechazos_acumulados` | ✘ | ✔ |
-| `descripcion`, `latitud`, `longitud`, `radio_cobertura_km` | se mantienen como hoy | ✔ |
+| `descripcion`, `localidad` y `provincia` (reemplazan a latitud, longitud y radio) | ✔ | ✔ |
 
 Los contadores de las pestañas ("Trabajos realizados (n)", "Opiniones (n)") se
 resuelven con **`COUNT` en la misma consulta del perfil**, no trayendo las

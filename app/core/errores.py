@@ -60,8 +60,8 @@ def error_validacion(campo: str, codigo: str, mensaje: str) -> ErrorValidacion:
     return ErrorValidacion([{"campo": campo, "codigo": codigo, "mensaje": mensaje}])
 
 
-def error_negocio(status_code: int, codigo: str, mensaje: str) -> HTTPException:
-    return HTTPException(status_code=status_code, detail={"codigo": codigo, "mensaje": mensaje})
+def error_negocio(status_code: int, codigo: str, mensaje: str, headers: dict[str, str] | None = None) -> HTTPException:
+    return HTTPException(status_code=status_code, detail={"codigo": codigo, "mensaje": mensaje}, headers=headers)
 
 
 def _campo(loc: tuple) -> str:

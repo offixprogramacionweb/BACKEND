@@ -17,6 +17,7 @@ from app.core.security import hash_password  # noqa: E402
 from app.db.database import Base, get_db  # noqa: E402
 from app.main import app  # noqa: E402
 from app.models.categoria import Categoria  # noqa: E402
+from app.models.ubicacion import Localidad, Provincia  # noqa: E402
 from app.models.usuario import RolUsuario, Usuario  # noqa: E402
 from app.services.auth0 import Auth0ServiceFake, get_auth0_service  # noqa: E402
 from app.services.email import EmailServiceFake, get_email_service  # noqa: E402
@@ -123,6 +124,18 @@ def crear_categoria_db(db_session, nombre: str = "Electricista") -> Categoria:
     db_session.commit()
     db_session.refresh(categoria)
     return categoria
+
+
+def crear_localidad_db(
+    db_session, id_localidad: str, nombre: str, provincia_id: str = "14", provincia_nombre: str = "Córdoba", departamento: str = "San Justo"
+) -> Localidad:
+    """Crea una localidad (y su provincia si falta), sin cargar el catálogo completo."""
+    if db_session.get(Provincia, provincia_id) is None:
+        db_session.add(Provincia(id_provincia=provincia_id, nombre=provincia_nombre))
+    localidad = Localidad(id_localidad=id_localidad, nombre=nombre, departamento=departamento, provincia_id=provincia_id)
+    db_session.add(localidad)
+    db_session.commit()
+    return localidad
 
 
 def crear_admin_db(db_session, email: str = "admin@test.com") -> Usuario:

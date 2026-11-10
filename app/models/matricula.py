@@ -4,6 +4,11 @@ from sqlalchemy.orm import relationship
 from app.db.database import Base
 
 
+class OrigenMatricula:
+    PADRON = "Padron"
+    ADMINISTRADOR = "Administrador"
+
+
 class TipoProfesionalMatricula:
     GASISTA = "Gasista"
     AIRE_ACONDICIONADO = "Aire acondicionado"
@@ -17,6 +22,8 @@ class ResultadoValidacion:
     REEMPLAZO_SOLICITADO = "Reemplazo_Solicitado"
     VENCIDA = "Vencida"
     NOMBRE_NO_COINCIDE = "Nombre_No_Coincide"
+    # HU-07 CA03: el administrador validó la matrícula a mano, sin padrón.
+    VALIDADA_ADMINISTRADOR = "Validada_Administrador"
 
 
 class EstadoReemplazo:
@@ -54,9 +61,12 @@ class Matricula(Base):
     oferente_id = Column(Integer, ForeignKey("oferentes.id_oferente", ondelete="CASCADE"), nullable=False, index=True)
     tipo_profesional = Column(String(50), nullable=False)
     numero_matricula = Column(String(20), nullable=False)
-    categoria = Column(String(50), nullable=False)
-    fecha_vencimiento = Column(Date, nullable=False)
+    # NULL cuando la validó el administrador (no hay datos del padrón).
+    categoria = Column(String(50), nullable=True)
+    fecha_vencimiento = Column(Date, nullable=True)
     fecha_fidelizacion = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    origen = Column(String(20), nullable=False, default=OrigenMatricula.PADRON, server_default=OrigenMatricula.PADRON)
+    validada_por_id = Column(Integer, ForeignKey("usuarios.id_usuario", ondelete="SET NULL"), nullable=True)
 
     oferente = relationship("Oferente", back_populates="matriculas")
 

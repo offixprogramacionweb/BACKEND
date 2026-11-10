@@ -266,7 +266,16 @@ def test_opiniones_muestran_nombre_de_pila_mas_inicial(client, db_session):
 
     assert opiniones[0]["cliente"] == "Juan C."
     assert opiniones[0]["puntuacion_global"] == 4.5
-    assert set(opiniones[0]) == {"id_resena", "cliente", "puntuacion_global", "criterios", "comentario", "fecha_creacion"}
+    assert set(opiniones[0]) == {
+        "id_resena",
+        "cliente",
+        "puntuacion_global",
+        "criterios",
+        "comentario",
+        "fecha_creacion",
+        "replica",
+        "puede_responder",
+    }
 
 
 def test_cantidad_resenas_del_perfil_cuenta_solo_las_aceptadas(client, db_session):

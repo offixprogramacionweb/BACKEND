@@ -3,6 +3,8 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 
+from fastapi import Query
+
 from app.core.deps import get_usuario_registrado
 from app.db.database import get_db
 from app.models.matricula import Matricula, ValidacionMatricula
@@ -43,6 +45,10 @@ def _armar_salida(db: Session, notificacion: Notificacion) -> NotificacionOut:
             )
             numero_actual = matricula_vigente.numero_matricula if matricula_vigente else None
 
+    if notificacion.oferente_id and oferente_nombre is None:
+        oferente = db.get(Oferente, notificacion.oferente_id)
+        oferente_nombre = oferente.nombre_completo if oferente else None
+
     return NotificacionOut(
         id_notificacion=notificacion.id_notificacion,
         tipo=notificacion.tipo,
@@ -50,6 +56,7 @@ def _armar_salida(db: Session, notificacion: Notificacion) -> NotificacionOut:
         requiere_accion=notificacion.requiere_accion,
         estado=notificacion.estado,
         resena_id=notificacion.resena_id,
+        oferente_id=notificacion.oferente_id,
         nombre_cliente=solicitud.nombre_cliente if solicitud else None,
         telefono_cliente_codigo_area=solicitud.telefono_cliente_codigo_area if solicitud else None,
         telefono_cliente_numero=solicitud.telefono_cliente_numero if solicitud else None,
@@ -71,6 +78,7 @@ def _armar_salida(db: Session, notificacion: Notificacion) -> NotificacionOut:
     responses=RESPUESTAS_AUTENTICADAS,
 )
 def listar_notificaciones(
+    solo_pendientes: bool = Query(default=False, description="true: oculta las descartadas (cruz) y las ya resueltas."),
     db: Session = Depends(get_db),
     usuario: Usuario = Depends(get_usuario_registrado),
 ):
@@ -79,12 +87,10 @@ def listar_notificaciones(
     cliente y la fecha, para que el Profesional pueda verificar la identidad y
     comunicarse. Sirve tanto al Oferente como al Administrador: la bandeja es
     del usuario, no del perfil."""
-    notificaciones = (
-        db.query(Notificacion)
-        .filter(Notificacion.usuario_id == usuario.id_usuario)
-        .order_by(Notificacion.fecha_creacion.desc(), Notificacion.id_notificacion.desc())
-        .all()
-    )
+    consulta = db.query(Notificacion).filter(Notificacion.usuario_id == usuario.id_usuario)
+    if solo_pendientes:
+        consulta = consulta.filter(Notificacion.estado == EstadoNotificacion.PENDIENTE)
+    notificaciones = consulta.order_by(Notificacion.fecha_creacion.desc(), Notificacion.id_notificacion.desc()).all()
     return [_armar_salida(db, notificacion) for notificacion in notificaciones]
 
 

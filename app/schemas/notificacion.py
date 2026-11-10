@@ -38,6 +38,7 @@ class NotificacionOut(BaseModel):
     requiere_accion: bool = Field(description="true si espera Aceptar/Rechazar; false si es informativa y solo se marca leída.")
     estado: str = Field(description="Pendiente | Aceptada | Rechazada | Leida")
     resena_id: int | None = None
+    oferente_id: int | None = Field(default=None, description="Profesional al que se refiere (campana del administrador).")
 
     nombre_cliente: str | None = Field(default=None, description="Solo en las notificaciones de reseña.")
     telefono_cliente_codigo_area: str | None = None

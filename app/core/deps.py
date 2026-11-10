@@ -4,6 +4,7 @@ from jose import JWTError, jwt
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.errores import DETALLE_CUENTA_SUSPENDIDA
 from app.db.database import get_db
 from app.models.oferente import Oferente
 from app.models.usuario import EstadoCuenta, RolUsuario, Usuario
@@ -36,7 +37,7 @@ def get_current_user(token: str = Depends(oauth2_scheme), db: Session = Depends(
     if usuario.estado_cuenta != EstadoCuenta.ACTIVA:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
-            detail="La cuenta no está activa",
+            detail=DETALLE_CUENTA_SUSPENDIDA,
             headers={"WWW-Authenticate": "Bearer"},
         )
     return usuario
@@ -54,6 +55,18 @@ def get_current_user_opcional(token: str | None = Depends(oauth2_scheme_opcional
     if not token:
         return None
     return get_current_user(token=token, db=db)
+
+
+def get_usuario_opcional_tolerante(token: str | None = Depends(oauth2_scheme_opcional), db: Session = Depends(get_db)) -> Usuario | None:
+    """Para listados públicos que cambian según quién mira (HU-01 v2.1,
+    `puede_responder`): un token vencido, inválido o de una cuenta suspendida se
+    trata como anónimo. No rompe la vista con 401."""
+    if not token:
+        return None
+    try:
+        return get_current_user(token=token, db=db)
+    except HTTPException:
+        return None
 
 
 def get_oferente_registrado(usuario: Usuario = Depends(get_current_user), db: Session = Depends(get_db)) -> Oferente:

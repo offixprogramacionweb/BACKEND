@@ -22,6 +22,7 @@ from app.models.archivo_adjunto import ArchivoAdjunto, TipoArchivo
 from app.models.trabajo_realizado import TrabajoRealizado
 from app.schemas.archivo import SubidaOut
 from app.schemas.trabajo import TrabajoCreate, TrabajoOut, FotoTrabajoOut
+from app.services.moderacion import trabajos_visibles
 from app.services.storage import ObjetoStorage, StorageService, url_publica
 
 MIME_PERMITIDOS = {"image/jpeg": "jpg", "image/png": "png"}
@@ -126,7 +127,12 @@ def eliminar_imagen_unica(db: Session, storage: StorageService, oferente_id: int
 
 
 def cantidad_trabajos(db: Session, oferente_id: int) -> int:
-    return db.query(func.count(TrabajoRealizado.id_trabajo)).filter(TrabajoRealizado.oferente_id == oferente_id).scalar()
+    """Los dados de baja por el administrador no cuentan para el límite (HU-07, A14)."""
+    return (
+        db.query(func.count(TrabajoRealizado.id_trabajo))
+        .filter(TrabajoRealizado.oferente_id == oferente_id, trabajos_visibles())
+        .scalar()
+    )
 
 
 def armar_trabajo(trabajo: TrabajoRealizado) -> TrabajoOut:

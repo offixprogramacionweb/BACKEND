@@ -81,7 +81,7 @@ def test_token_emitido_antes_de_bloquear_deja_de_servir_al_instante(client, db_s
     # El token viejo todavía no venció, pero la cuenta ya no está activa.
     respuesta = client.get("/api/v1/auth/me", headers=cabecera)
     assert respuesta.status_code == 401
-    assert respuesta.json()["detail"] == "La cuenta no está activa"
+    assert respuesta.json()["detail"]["codigo"] == "cuenta_suspendida"
 
 
 def test_al_reactivar_el_login_emite_un_token_nuevo_que_sirve(client, db_session):

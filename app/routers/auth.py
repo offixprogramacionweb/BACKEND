@@ -7,6 +7,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.deps import get_current_user
+from app.core.errores import DETALLE_CUENTA_SUSPENDIDA
 from app.core.security import create_access_token, hash_password, verify_password
 from app.db.database import get_db
 from app.models.oferente import Oferente
@@ -49,7 +50,7 @@ def registrar_usuario(payload: UsuarioCreate, db: Session = Depends(get_db)):
     summary="Iniciar sesión",
     responses={
         401: {"description": "Email o contraseña incorrectos"},
-        403: {"description": "La cuenta está suspendida o bloqueada"},
+        403: {"description": "La cuenta está suspendida o bloqueada (`detail.codigo = cuenta_suspendida`)"},
     },
 )
 def login(payload: UsuarioLogin, db: Session = Depends(get_db)):
@@ -63,7 +64,7 @@ def login(payload: UsuarioLogin, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Credenciales inválidas")
 
     if usuario.estado_cuenta != EstadoCuenta.ACTIVA:
-        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="La cuenta no está activa")
+        raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail=DETALLE_CUENTA_SUSPENDIDA)
 
     token = create_access_token(subject=str(usuario.id_usuario), extra_claims={"rol": usuario.rol})
     return Token(access_token=token)
@@ -170,12 +171,18 @@ def callback_login_google(
     except Auth0Error:
         return _redirect_error("auth0_error")
 
+    # HU-07 CA01: los correos de ADMIN_EMAILS entran como Administrador. Un
+    # Profesional registrado con ese correo sigue siendo Profesional.
+    es_administrador = perfil.email.lower() in settings.admin_emails_list
+
     usuario = db.query(Usuario).filter(Usuario.email == perfil.email).first()
     if usuario:
         if usuario.estado_cuenta != EstadoCuenta.ACTIVA:
-            return _redirect_error("cuenta_inactiva")
+            return _redirect_error("cuenta_suspendida")
         usuario.nombre = perfil.nombre
         usuario.apellido = perfil.apellido
+        if es_administrador and usuario.rol == RolUsuario.OFERENTE and db.get(Oferente, usuario.id_usuario) is None:
+            usuario.rol = RolUsuario.ADMINISTRADOR
     else:
         usuario = Usuario(
             email=perfil.email,
@@ -183,7 +190,7 @@ def callback_login_google(
             # de un valor aleatorio que nadie conoce, así que /login (email +
             # password) nunca la puede autenticar por accidente.
             password_hash=hash_password(secrets.token_urlsafe(32)),
-            rol=RolUsuario.OFERENTE,
+            rol=RolUsuario.ADMINISTRADOR if es_administrador else RolUsuario.OFERENTE,
             nombre=perfil.nombre,
             apellido=perfil.apellido,
         )

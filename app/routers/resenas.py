@@ -2,13 +2,13 @@ import math
 import uuid
 from datetime import datetime, timedelta, timezone
 
-from fastapi import APIRouter, Depends, HTTPException, Query, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Response, status
 from sqlalchemy import func, update
 from sqlalchemy.exc import IntegrityError
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, selectinload
 
 from app.core.config import settings
-from app.core.deps import get_current_user_opcional, get_oferente_registrado
+from app.core.deps import get_current_user_opcional, get_oferente_registrado, get_usuario_opcional_tolerante
 from app.core.errores import error_negocio, error_validacion
 from app.db.database import get_db
 from app.models.alerta_admin import AlertaAdministrador, EstadoRevisionAlerta
@@ -16,8 +16,10 @@ from app.models.emision_resena import EmisionResena
 from app.models.oferente import Oferente
 from app.models.resena import EstadoResena, Resena
 from app.models.solicitud_resena import EstadoSolicitud, OrigenSolicitud, SolicitudResena
-from app.models.usuario import Usuario
+from app.models.usuario import EstadoCuenta, Usuario
 from app.schemas.resena import (
+    ReplicaCreate,
+    ReplicaOut,
     ResenaCreate,
     ResenaModeracion,
     ResenaOut,
@@ -30,13 +32,17 @@ from app.schemas.resena import (
 )
 from app.services.email import EmailError, EmailService, get_email_service, url_resena
 from app.services.mensajes import armar_whatsapp_url
-from app.services.notificaciones import crear_notificacion_resena_nueva, resolver_notificacion_de_resena
-from app.services.resenas import recalcular_promedio
+from app.services.moderacion import resenas_visibles
+from app.services.notificaciones import (
+    crear_notificacion_resena_nueva,
+    notificar_rechazos_reiterados,
+    resolver_notificacion_de_resena,
+)
+from app.services.resenas import recalcular_promedio, recalcular_rechazos, registrar_replica
 
 router = APIRouter(prefix="/api/v1", tags=["Reseñas"])
 
 UMBRAL_RECHAZOS_ALERTA = 5
-VENTANA_ULTIMAS_RESENAS = 10
 VENTANA_LIMITES_HORAS = 24
 
 
@@ -237,7 +243,7 @@ def generar_solicitud_resena(
       el mail.
     """
     oferente = db.get(Oferente, oferente_id)
-    if not oferente:
+    if not oferente or oferente.usuario.estado_cuenta != EstadoCuenta.ACTIVA:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Oferente no encontrado")
 
     es_dueno = usuario is not None and usuario.id_usuario == oferente.id_oferente
@@ -413,13 +419,19 @@ def listar_resenas_publicas(
     pagina: int = Query(1, ge=1, description="Número de página, desde 1."),
     por_pagina: int = Query(5, ge=1, le=10, description="Opiniones por página: 5 o 10 según lo que elija el frontend."),
     db: Session = Depends(get_db),
+    usuario: Usuario | None = Depends(get_usuario_opcional_tolerante),
 ):
-    """RF7 / HU-01 T07 — Solo reseñas `Aceptada`, más nuevas primero. Sin datos
-    de contacto del cliente y con el nombre reducido a "Juan C."."""
-    aceptadas = db.query(Resena).filter(Resena.oferente_id == oferente_id, Resena.estado == EstadoResena.ACEPTADA)
+    """RF7 / HU-01 T07 - Solo reseñas `Aceptada`, más nuevas primero. Sin datos
+    de contacto del cliente y con el nombre reducido a "Juan C.".
+
+    HU-01 v2.1: cada reseña trae su `replica` (o null) y `puede_responder`, que
+    es true solo para el Profesional dueño, con sesión, si todavía no respondió."""
+    aceptadas = db.query(Resena).filter(Resena.oferente_id == oferente_id, resenas_visibles())
     total = aceptadas.count()
+    es_dueno = usuario is not None and usuario.id_usuario == oferente_id
     resenas = (
-        aceptadas.order_by(Resena.fecha_creacion.desc(), Resena.id_resena.desc())
+        aceptadas.options(selectinload(Resena.replica))
+        .order_by(Resena.fecha_creacion.desc(), Resena.id_resena.desc())
         .offset((pagina - 1) * por_pagina)
         .limit(por_pagina)
         .all()
@@ -433,6 +445,8 @@ def listar_resenas_publicas(
                 criterios=resena.calificaciones_comentarios["criterios"],
                 comentario=resena.calificaciones_comentarios.get("comentario"),
                 fecha_creacion=resena.fecha_creacion,
+                replica=ReplicaOut.model_validate(resena.replica) if resena.replica else None,
+                puede_responder=es_dueno and resena.replica is None,
             )
             for resena in resenas
         ],
@@ -441,6 +455,39 @@ def listar_resenas_publicas(
         por_pagina=por_pagina,
         paginas=math.ceil(total / por_pagina),
     )
+
+
+@router.post(
+    "/resenas/{resena_id}/replica",
+    response_model=ReplicaOut,
+    status_code=status.HTTP_201_CREATED,
+    summary="Responder una reseña publicada (HU-01 v2.1)",
+    responses={
+        200: {"description": "Ya existía la misma réplica (doble envío): se devuelve la registrada"},
+        400: {"description": "La reseña no está publicada (`resena_no_publicada`)"},
+        401: {"description": "Falta token o es inválido"},
+        403: {"description": "No es el Profesional dueño de la reseña, o es un Administrador"},
+        404: {"description": "Reseña no encontrada"},
+        409: {"description": "La reseña ya tiene otra réplica (`replica_existente`)"},
+        422: {"description": "Comentario vacío (`comentario_requerido`) o de más de 500 caracteres (`comentario_demasiado_largo`)"},
+    },
+)
+def responder_resena(
+    resena_id: int,
+    payload: ReplicaCreate,
+    response: Response,
+    db: Session = Depends(get_db),
+    oferente: Oferente = Depends(get_oferente_registrado),
+):
+    """HU-01 v2.1 - Una única réplica por reseña, sin edición ni borrado (CA03).
+    Solo el dueño puede responder (CA04). Un doble clic con el mismo texto
+    devuelve 200 con la réplica ya registrada."""
+    replica, creada = registrar_replica(db, oferente, resena_id, payload.texto)
+    db.commit()
+    db.refresh(replica)
+    if not creada:
+        response.status_code = status.HTTP_200_OK
+    return ReplicaOut.model_validate(replica)
 
 
 @router.patch(
@@ -486,15 +533,8 @@ def moderar_resena(
         resena.estado = EstadoResena.RECHAZADA
         db.flush()  # sin esto, la consulta de abajo no vería este rechazo
 
-        ultimas = (
-            db.query(Resena)
-            .filter(Resena.oferente_id == oferente.id_oferente, Resena.estado != EstadoResena.PENDIENTE_ACEPTACION)
-            .order_by(Resena.fecha_creacion.desc())
-            .limit(VENTANA_ULTIMAS_RESENAS)
-            .all()
-        )
-        rechazadas = sum(1 for r in ultimas if r.estado == EstadoResena.RECHAZADA)
-        oferente.cantidad_rechazos_acumulados = rechazadas
+        # HU-07 CA08: el umbral son 5 rechazadas en total (antes: 5 de las últimas 10).
+        rechazadas = recalcular_rechazos(db, oferente)
 
         alerta_pendiente = (
             db.query(AlertaAdministrador.id_alerta)
@@ -504,13 +544,10 @@ def moderar_resena(
             )
             .first()
         )
-        if rechazadas >= UMBRAL_RECHAZOS_ALERTA and alerta_pendiente is None:
-            db.add(
-                AlertaAdministrador(
-                    oferente_id=oferente.id_oferente,
-                    motivo=f"{rechazadas} de las últimas {VENTANA_ULTIMAS_RESENAS} reseñas fueron rechazadas",
-                )
-            )
+        if rechazadas >= UMBRAL_RECHAZOS_ALERTA:
+            notificar_rechazos_reiterados(db, oferente)
+            if alerta_pendiente is None:
+                db.add(AlertaAdministrador(oferente_id=oferente.id_oferente, motivo=f"{rechazadas} reseñas rechazadas en total"))
 
     resolver_notificacion_de_resena(db, resena, aceptada=payload.aceptar)
 

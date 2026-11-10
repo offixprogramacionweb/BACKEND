@@ -106,3 +106,7 @@ async def manejar_error_validacion(request: Request, exc: ErrorValidacion) -> JS
 def registrar_manejadores(app: FastAPI) -> None:
     app.add_exception_handler(RequestValidationError, manejar_validacion_request)
     app.add_exception_handler(ErrorValidacion, manejar_error_validacion)
+
+
+MENSAJE_CUENTA_SUSPENDIDA = "Su cuenta se encuentra suspendida, comunicarse con Asesoría."
+DETALLE_CUENTA_SUSPENDIDA = {"codigo": "cuenta_suspendida", "mensaje": MENSAJE_CUENTA_SUSPENDIDA}

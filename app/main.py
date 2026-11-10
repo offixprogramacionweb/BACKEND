@@ -5,14 +5,17 @@ from fastapi.responses import JSONResponse
 
 from app.core.config import settings
 from app.db.database import preparar_esquema
+from app.services.migraciones import estado_migraciones
 from app.models import (  # noqa: F401
     alerta_admin,
     archivo_adjunto,
+    auditoria_moderacion,
     categoria,
     matricula,
     notificacion,
     oferente,
     oferente_dia_atencion,
+    replica_resena,
     resena,
     solicitud_resena,
     trabajo_realizado,
@@ -52,6 +55,7 @@ app = FastAPI(
         "El spec completo también está disponible en `/openapi.json` y como archivo estático en "
         "`docs/openapi.json` del repo — se puede importar directo en Hoppscotch como colección.\n\n"
         "### Estado del proyecto\n"
+        "Sprint 3 — administración y moderación (HU-07) y réplica del Profesional a las reseñas (HU-01 v2.1). "
         "Sprint 2 — registro de Profesional (HU-04) con perfil público y privado, fotos y trabajos realizados "
         "en Supabase Storage, y reseñas con las reglas de HU-01 v1.2. Ver `docs/plan-sprint-2.md` para el "
         "detalle de alcance y decisiones."
@@ -105,6 +109,14 @@ def on_startup():
     preparar_esquema()
 
 
-@app.get("/health", tags=["Salud"], summary="Chequeo de salud del servicio")
+@app.get(
+    "/health",
+    tags=["Salud"],
+    summary="Chequeo de salud del servicio y de las migraciones",
+    responses={503: {"description": "La base no está en la revisión que espera el código (migraciones pendientes)"}},
+)
 def health_check():
-    return {"status": "ok"}
+    estado = estado_migraciones()
+    if estado["migraciones"] == "pendientes":
+        return JSONResponse(status_code=status.HTTP_503_SERVICE_UNAVAILABLE, content={"status": "error", **estado})
+    return {"status": "ok", **estado}

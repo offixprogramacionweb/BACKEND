@@ -77,6 +77,10 @@ class Settings(BaseSettings):
     resena_limite_por_email_24h: int = 5
     resena_limite_por_oferente_24h: int = 30
 
+    # HU-07 CA01: correos que entran con rol Administrador al loguearse con Google.
+    # Lista separada por comas. Sin valor, no hay administradores por Google.
+    admin_emails: str = ""
+
     model_config = SettingsConfigDict(env_file=".env", env_file_encoding="utf-8")
 
     @property
@@ -86,6 +90,10 @@ class Settings(BaseSettings):
     @property
     def cors_origins_list(self) -> list[str]:
         return [origin.strip() for origin in self.cors_origins.split(",") if origin.strip()]
+
+    @property
+    def admin_emails_list(self) -> set[str]:
+        return {correo.strip().lower() for correo in self.admin_emails.split(",") if correo.strip()}
 
     @property
     def frontend_url_base(self) -> str:

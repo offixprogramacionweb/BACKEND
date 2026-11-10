@@ -35,6 +35,7 @@ from app.schemas.oferente import (
     OferentesPaginadosOut,
 )
 from app.services.mensajes import armar_whatsapp_contacto, telefono_partes_son_validas
+from app.services.moderacion import resenas_visibles, trabajos_visibles
 from app.services.storage import url_publica
 
 # Campos que la edición no puede dejar en NULL: el registro los exige.
@@ -66,12 +67,12 @@ def _url_unica(db: Session, oferente_id: int, tipo: str) -> str | None:
 
 def armar_publica(db: Session, oferente: Oferente) -> OferentePublicoOut:
     cantidad_resenas = (
-        db.query(func.count(Resena.id_resena))
-        .filter(Resena.oferente_id == oferente.id_oferente, Resena.estado == EstadoResena.ACEPTADA)
-        .scalar()
+        db.query(func.count(Resena.id_resena)).filter(Resena.oferente_id == oferente.id_oferente, resenas_visibles()).scalar()
     )
     cantidad_trabajos = (
-        db.query(func.count(TrabajoRealizado.id_trabajo)).filter(TrabajoRealizado.oferente_id == oferente.id_oferente).scalar()
+        db.query(func.count(TrabajoRealizado.id_trabajo))
+        .filter(TrabajoRealizado.oferente_id == oferente.id_oferente, trabajos_visibles())
+        .scalar()
     )
     categoria = oferente.categoria
     localidad = oferente.localidad

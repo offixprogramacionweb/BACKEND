@@ -31,6 +31,11 @@ class Resena(Base):
     estado = Column(String(50), nullable=False, default=EstadoResena.PENDIENTE_ACEPTACION)
     fecha_creacion = Column(DateTime(timezone=True), server_default=func.now())
 
+    # HU-07: baja lógica por el administrador. No se borra: se puede reactivar.
+    dado_de_baja_en = Column(DateTime(timezone=True), nullable=True)
+    dado_de_baja_por_id = Column(Integer, ForeignKey("usuarios.id_usuario", ondelete="SET NULL"), nullable=True)
+
     oferente = relationship("Oferente", back_populates="resenas")
     solicitud = relationship("SolicitudResena", back_populates="resenas")
     notificaciones = relationship("Notificacion", back_populates="resena", cascade="all, delete-orphan")
+    replica = relationship("ReplicaResena", back_populates="resena", uselist=False, cascade="all, delete-orphan")

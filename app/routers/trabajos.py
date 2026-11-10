@@ -5,6 +5,7 @@ from app.core.deps import get_oferente_registrado
 from app.db.database import get_db
 from app.models.oferente import Oferente
 from app.models.trabajo_realizado import TrabajoRealizado
+from app.services.moderacion import trabajos_visibles
 from app.schemas.trabajo import TrabajoCreate, TrabajoOut
 from app.services.archivos import armar_trabajo, crear_trabajo, eliminar_trabajo
 from app.services.storage import StorageService, get_storage_service
@@ -26,7 +27,7 @@ def listar_trabajos(oferente_id: int, db: Session = Depends(get_db)):
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Oferente no encontrado")
     trabajos = (
         db.query(TrabajoRealizado)
-        .filter(TrabajoRealizado.oferente_id == oferente_id)
+        .filter(TrabajoRealizado.oferente_id == oferente_id, trabajos_visibles())
         .order_by(TrabajoRealizado.fecha_creacion.desc(), TrabajoRealizado.id_trabajo.desc())
         .all()
     )

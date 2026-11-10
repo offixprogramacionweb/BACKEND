@@ -19,6 +19,9 @@ class TrabajoRealizado(Base):
     titulo = Column(String(100), nullable=False)
     descripcion = Column(Text, nullable=True)
     fecha_creacion = Column(DateTime(timezone=True), nullable=False, server_default=func.now())
+    # HU-07: baja lógica por el administrador (ver Resena).
+    dado_de_baja_en = Column(DateTime(timezone=True), nullable=True)
+    dado_de_baja_por_id = Column(Integer, ForeignKey("usuarios.id_usuario", ondelete="SET NULL"), nullable=True)
 
     oferente = relationship("Oferente", back_populates="trabajos")
     fotos = relationship(

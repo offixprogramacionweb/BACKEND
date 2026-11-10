@@ -18,6 +18,7 @@ from difflib import SequenceMatcher
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
+from app.core.errores import error_validacion
 from app.models.matricula import EstadoReemplazo, Matricula, PadronMatricula, ResultadoValidacion, ValidacionMatricula
 from app.models.notificacion import EstadoNotificacion, Notificacion, TipoNotificacion
 from app.models.oferente import Oferente
@@ -391,3 +392,19 @@ def resolver_reemplazo(db: Session, validacion: ValidacionMatricula, autorizar: 
     )
     db.flush()
     return matricula
+
+
+def validar_formato_matricula(tipo_profesional: str, numero_matricula: str) -> str:
+    """Formato de la matrícula según el tipo (HU-02 CA01 y HU-07 CA03): solo dígitos
+    y cantidad dentro del rango del tipo. Devuelve el número recortado."""
+    if tipo_profesional not in RANGO_DIGITOS_POR_TIPO:
+        raise error_validacion("tipo_profesional", "tipo_invalido", "Seleccioná un tipo de profesional de la lista")
+    numero = (numero_matricula or "").strip()
+    minimo, maximo = RANGO_DIGITOS_POR_TIPO[tipo_profesional]
+    if numero and not numero.isdigit():
+        raise error_validacion("numero_matricula", "solo_digitos", "El número de matrícula solo puede tener dígitos")
+    if not (minimo <= len(numero) <= maximo):
+        if minimo == maximo:
+            raise error_validacion("numero_matricula", "digitos_invalidos", f"Debe ingresar {maximo} dígitos")
+        raise error_validacion("numero_matricula", "digitos_invalidos", f"Debe ingresar entre {minimo} y {maximo} dígitos")
+    return numero

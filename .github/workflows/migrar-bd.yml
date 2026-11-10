@@ -1,0 +1,39 @@
+# Corre `alembic upgrade head` en cada push a main que toca migraciones, así la
+# base nunca queda atrás del código (ver docs/plan-HU-07-HU-01-v2.1.md, D19).
+#
+# Requisito (una sola vez): repo > Settings > Secrets and variables > Actions >
+# New repository secret:
+#   DATABASE_URL_MIGRACIONES = URI de Supabase en el puerto 5432 (session pooler),
+#                              con la contraseña URL-encodeada. Ver .env.example.
+
+name: Migrar base de datos
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "migrations/**"
+      - "app/models/**"
+      - "alembic.ini"
+  workflow_dispatch:
+
+jobs:
+  migrar:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Instalar dependencias
+        run: pip install -r requirements.txt
+
+      - name: Aplicar migraciones pendientes
+        run: alembic upgrade head
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL_MIGRACIONES }}
+          DATABASE_SCHEMA: offix
+          SECRET_KEY: ci-no-se-usa

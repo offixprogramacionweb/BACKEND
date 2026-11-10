@@ -97,7 +97,7 @@
             "description": "Email o contraseña incorrectos"
           },
           "403": {
-            "description": "La cuenta está suspendida o bloqueada"
+            "description": "La cuenta está suspendida o bloqueada (`detail.codigo = cuenta_suspendida`)"
           },
           "422": {
             "description": "Validation Error",
@@ -707,8 +707,13 @@
           "Oferentes"
         ],
         "summary": "Consultar el perfil de un profesional (público)",
-        "description": "RF7 — Perfil público. No devuelve DNI/CUIT, estado de verificación ni\nrechazos acumulados.",
+        "description": "RF7 — Perfil público. No devuelve DNI/CUIT, estado de verificación ni\nrechazos acumulados. HU-07 A5: un Profesional suspendido no tiene perfil\npúblico; el Administrador sí lo puede ver.",
         "operationId": "obtener_oferente_api_v1_oferentes__oferente_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "oferente_id",
@@ -732,7 +737,7 @@
             }
           },
           "404": {
-            "description": "Oferente no encontrado"
+            "description": "Oferente no encontrado (o suspendido, salvo para un Administrador)"
           },
           "422": {
             "description": "Validation Error",
@@ -1521,8 +1526,13 @@
           "Reseñas"
         ],
         "summary": "Opiniones aceptadas de un Profesional, paginadas (público)",
-        "description": "RF7 / HU-01 T07 — Solo reseñas `Aceptada`, más nuevas primero. Sin datos\nde contacto del cliente y con el nombre reducido a \"Juan C.\".",
+        "description": "RF7 / HU-01 T07 - Solo reseñas `Aceptada`, más nuevas primero. Sin datos\nde contacto del cliente y con el nombre reducido a \"Juan C.\".\n\nHU-01 v2.1: cada reseña trae su `replica` (o null) y `puede_responder`, que\nes true solo para el Profesional dueño, con sesión, si todavía no respondió.",
         "operationId": "listar_resenas_publicas_api_v1_oferentes__oferente_id__resenas_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
         "parameters": [
           {
             "name": "oferente_id",
@@ -1574,6 +1584,75 @@
           },
           "422": {
             "description": "`pagina` menor a 1, o `por_pagina` fuera de 1 a 10"
+          }
+        }
+      }
+    },
+    "/api/v1/resenas/{resena_id}/replica": {
+      "post": {
+        "tags": [
+          "Reseñas"
+        ],
+        "summary": "Responder una reseña publicada (HU-01 v2.1)",
+        "description": "HU-01 v2.1 - Una única réplica por reseña, sin edición ni borrado (CA03).\nSolo el dueño puede responder (CA04). Un doble clic con el mismo texto\ndevuelve 200 con la réplica ya registrada.",
+        "operationId": "responder_resena_api_v1_resenas__resena_id__replica_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resena_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resena Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ReplicaCreate"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ReplicaOut"
+                }
+              }
+            }
+          },
+          "200": {
+            "description": "Ya existía la misma réplica (doble envío): se devuelve la registrada"
+          },
+          "400": {
+            "description": "La reseña no está publicada (`resena_no_publicada`)"
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "No es el Profesional dueño de la reseña, o es un Administrador"
+          },
+          "404": {
+            "description": "Reseña no encontrada"
+          },
+          "409": {
+            "description": "La reseña ya tiene otra réplica (`replica_existente`)"
+          },
+          "422": {
+            "description": "Comentario vacío (`comentario_requerido`) o de más de 500 caracteres (`comentario_demasiado_largo`)"
           }
         }
       }
@@ -1656,16 +1735,35 @@
         "summary": "Bandeja de notificaciones del usuario autenticado",
         "description": "HU-01 / CA04 — Lo que se despliega al abrir la campana, **más recientes\nprimero**. Cada tarjeta de reseña muestra los datos de contacto que cargó el\ncliente y la fecha, para que el Profesional pueda verificar la identidad y\ncomunicarse. Sirve tanto al Oferente como al Administrador: la bandeja es\ndel usuario, no del perfil.",
         "operationId": "listar_notificaciones_api_v1_notificaciones_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "solo_pendientes",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "boolean",
+              "description": "true: oculta las descartadas (cruz) y las ya resueltas.",
+              "default": false,
+              "title": "Solo Pendientes"
+            },
+            "description": "true: oculta las descartadas (cruz) y las ya resueltas."
+          }
+        ],
         "responses": {
           "200": {
             "description": "Successful Response",
             "content": {
               "application/json": {
                 "schema": {
+                  "type": "array",
                   "items": {
                     "$ref": "#/components/schemas/NotificacionOut"
                   },
-                  "type": "array",
                   "title": "Response Listar Notificaciones Api V1 Notificaciones Get"
                 }
               }
@@ -1673,13 +1771,18 @@
           },
           "401": {
             "description": "Falta token o es inválido"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
           }
-        },
-        "security": [
-          {
-            "OAuth2PasswordBearer": []
-          }
-        ]
+        }
       }
     },
     "/api/v1/notificaciones/contador": {
@@ -2284,6 +2387,791 @@
         }
       }
     },
+    "/api/v1/admin/oferentes": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Grilla de Profesionales: búsqueda, filtro por estado y paginado (HU-07 CA02)",
+        "operationId": "listar_oferentes_admin_api_v1_admin_oferentes_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "q",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "anyOf": [
+                {
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ],
+              "description": "Nombre, rubro, especialidad o matrícula (coincidencia parcial).",
+              "title": "Q"
+            },
+            "description": "Nombre, rubro, especialidad o matrícula (coincidencia parcial)."
+          },
+          {
+            "name": "estado",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "todos",
+                "activos",
+                "suspendidos"
+              ],
+              "type": "string",
+              "default": "todos",
+              "title": "Estado"
+            }
+          },
+          {
+            "name": "pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "minimum": 1,
+              "default": 1,
+              "title": "Pagina"
+            }
+          },
+          {
+            "name": "por_pagina",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "type": "integer",
+              "description": "10, 25 o 50.",
+              "default": 25,
+              "title": "Por Pagina"
+            },
+            "description": "10, 25 o 50."
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OferentesAdminPaginadosOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "422": {
+            "description": "`estado` o `por_pagina` inválidos"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/oferentes/{oferente_id}": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Tarjeta de un Profesional para la moderación",
+        "operationId": "obtener_oferente_admin_api_v1_admin_oferentes__oferente_id__get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "oferente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Oferente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OferenteAdminDetalle"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/oferentes/{oferente_id}/suspender": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Suspender la cuenta de un Profesional (HU-07 CA06)",
+        "description": "La confirmación previa la pide el frontend. Si la cuenta ya está suspendida,\nresponde igual, sin registrar otra vez en la auditoría.",
+        "operationId": "suspender_oferente_api_v1_admin_oferentes__oferente_id__suspender_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "oferente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Oferente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OferenteAdminFila"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "400": {
+            "description": "No se puede suspender a un administrador"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/oferentes/{oferente_id}/dar-de-alta": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Dar de alta (reactivar) la cuenta de un Profesional suspendido (HU-07 CA06)",
+        "operationId": "dar_de_alta_oferente_api_v1_admin_oferentes__oferente_id__dar_de_alta_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "oferente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Oferente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OferenteAdminFila"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/oferentes/{oferente_id}/matriculas": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Validar a mano la matrícula de un Profesional, sin padrón (HU-07 CA03)",
+        "operationId": "validar_matricula_oferente_api_v1_admin_oferentes__oferente_id__matriculas_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "oferente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Oferente Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/MatriculaAdminIn"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/OferenteAdminFila"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "409": {
+            "description": "La matrícula ya está fidelizada por otro Profesional (`matricula_de_otro_oferente`)"
+          },
+          "422": {
+            "description": "Tipo inválido, o el número no tiene solo dígitos o la cantidad del tipo"
+          }
+        }
+      }
+    },
+    "/api/v1/admin/oferentes/{oferente_id}/resenas": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Opiniones de un Profesional para moderar (HU-07 CA04)",
+        "operationId": "listar_resenas_oferente_api_v1_admin_oferentes__oferente_id__resenas_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "oferente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Oferente Id"
+            }
+          },
+          {
+            "name": "filtro",
+            "in": "query",
+            "required": false,
+            "schema": {
+              "enum": [
+                "todas",
+                "aceptadas",
+                "rechazadas",
+                "dadas_de_baja"
+              ],
+              "type": "string",
+              "default": "todas",
+              "title": "Filtro"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/ResenaModeracionOut"
+                  },
+                  "title": "Response Listar Resenas Oferente Api V1 Admin Oferentes  Oferente Id  Resenas Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/oferentes/{oferente_id}/trabajos": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Trabajos de un Profesional para auditar (HU-07 CA04)",
+        "operationId": "listar_trabajos_oferente_api_v1_admin_oferentes__oferente_id__trabajos_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "oferente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Oferente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/TrabajoModeracionOut"
+                  },
+                  "title": "Response Listar Trabajos Oferente Api V1 Admin Oferentes  Oferente Id  Trabajos Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/oferentes/{oferente_id}/auditoria": {
+      "get": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Historial de acciones de moderación sobre un Profesional",
+        "operationId": "listar_auditoria_oferente_api_v1_admin_oferentes__oferente_id__auditoria_get",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "oferente_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Oferente Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "array",
+                  "items": {
+                    "$ref": "#/components/schemas/AuditoriaOut"
+                  },
+                  "title": "Response Listar Auditoria Oferente Api V1 Admin Oferentes  Oferente Id  Auditoria Get"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/resenas/{resena_id}/dar-de-baja": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Dar de baja una opinión publicada (HU-07 CA05)",
+        "description": "Deja de mostrarse en el perfil y ajusta calificación y cantidad. Queda en auditoría.\nSi ya estaba dada de baja, responde igual sin registrarlo de nuevo.",
+        "operationId": "dar_de_baja_resena_api_v1_admin_resenas__resena_id__dar_de_baja_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resena_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resena Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/BajaIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccionResenaOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "400": {
+            "description": "Solo se pueden dar de baja opiniones publicadas (`resena_no_aceptada`)"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/resenas/{resena_id}/reactivar": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Reactivar una opinión dada de baja (HU-07 CA05)",
+        "operationId": "reactivar_resena_api_v1_admin_resenas__resena_id__reactivar_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "resena_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Resena Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccionResenaOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/trabajos/{trabajo_id}/dar-de-baja": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Dar de baja un trabajo realizado (HU-07 CA05)",
+        "operationId": "dar_de_baja_trabajo_api_v1_admin_trabajos__trabajo_id__dar_de_baja_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "trabajo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Trabajo Id"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "anyOf": [
+                  {
+                    "$ref": "#/components/schemas/BajaIn"
+                  },
+                  {
+                    "type": "null"
+                  }
+                ],
+                "title": "Payload"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccionTrabajoOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/api/v1/admin/trabajos/{trabajo_id}/reactivar": {
+      "post": {
+        "tags": [
+          "Administración"
+        ],
+        "summary": "Reactivar un trabajo dado de baja (HU-07 CA05)",
+        "operationId": "reactivar_trabajo_api_v1_admin_trabajos__trabajo_id__reactivar_post",
+        "security": [
+          {
+            "OAuth2PasswordBearer": []
+          }
+        ],
+        "parameters": [
+          {
+            "name": "trabajo_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "integer",
+              "title": "Trabajo Id"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Successful Response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/AccionTrabajoOut"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "Falta token o es inválido"
+          },
+          "403": {
+            "description": "Requiere rol Administrador"
+          },
+          "404": {
+            "description": "No existe el Profesional, la reseña o el trabajo"
+          },
+          "422": {
+            "description": "Validation Error",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HTTPValidationError"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
     "/api/v1/cron/padrones/sync": {
       "post": {
         "tags": [
@@ -2466,7 +3354,7 @@
         "tags": [
           "Salud"
         ],
-        "summary": "Chequeo de salud del servicio",
+        "summary": "Chequeo de salud del servicio y de las migraciones",
         "operationId": "health_check_health_get",
         "responses": {
           "200": {
@@ -2476,6 +3364,9 @@
                 "schema": {}
               }
             }
+          },
+          "503": {
+            "description": "La base no está en la revisión que espera el código (migraciones pendientes)"
           }
         }
       }
@@ -2483,6 +3374,39 @@
   },
   "components": {
     "schemas": {
+      "AccionResenaOut": {
+        "properties": {
+          "resena": {
+            "$ref": "#/components/schemas/ResenaModeracionOut"
+          },
+          "oferente": {
+            "$ref": "#/components/schemas/OferenteAdminFila",
+            "description": "Métricas ya recalculadas, para actualizar la tarjeta sin otro request."
+          }
+        },
+        "type": "object",
+        "required": [
+          "resena",
+          "oferente"
+        ],
+        "title": "AccionResenaOut"
+      },
+      "AccionTrabajoOut": {
+        "properties": {
+          "trabajo": {
+            "$ref": "#/components/schemas/TrabajoModeracionOut"
+          },
+          "oferente": {
+            "$ref": "#/components/schemas/OferenteAdminFila"
+          }
+        },
+        "type": "object",
+        "required": [
+          "trabajo",
+          "oferente"
+        ],
+        "title": "AccionTrabajoOut"
+      },
       "ArchivoRefIn": {
         "properties": {
           "path": {
@@ -2501,6 +3425,93 @@
         "example": {
           "path": "oferentes/7/perfil/ab12cd34ef56ab12cd34ef56ab12cd34.jpg"
         }
+      },
+      "AuditoriaOut": {
+        "properties": {
+          "id_auditoria": {
+            "type": "integer",
+            "title": "Id Auditoria"
+          },
+          "accion": {
+            "type": "string",
+            "title": "Accion"
+          },
+          "fecha": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha"
+          },
+          "administrador_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Administrador Id"
+          },
+          "resena_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Resena Id"
+          },
+          "trabajo_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Trabajo Id"
+          },
+          "detalle": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Detalle"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_auditoria",
+          "accion",
+          "fecha"
+        ],
+        "title": "AuditoriaOut"
+      },
+      "BajaIn": {
+        "properties": {
+          "motivo": {
+            "anyOf": [
+              {
+                "type": "string",
+                "maxLength": 200
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Motivo",
+            "description": "Opcional. Se guarda en el historial de auditoría."
+          }
+        },
+        "type": "object",
+        "title": "BajaIn"
       },
       "CalificacionesComentariosIn": {
         "properties": {
@@ -2739,6 +3750,26 @@
           "pendientes_de_accion": 2,
           "sin_leer": 5
         }
+      },
+      "ContadoresOferentes": {
+        "properties": {
+          "activos": {
+            "type": "integer",
+            "title": "Activos",
+            "description": "Cantidad global de Profesionales activos. No depende del filtro."
+          },
+          "suspendidos": {
+            "type": "integer",
+            "title": "Suspendidos",
+            "description": "Cantidad global de Profesionales suspendidos. No depende del filtro."
+          }
+        },
+        "type": "object",
+        "required": [
+          "activos",
+          "suspendidos"
+        ],
+        "title": "ContadoresOferentes"
       },
       "CriteriosValoracion": {
         "properties": {
@@ -2991,6 +4022,31 @@
         ],
         "title": "LocalidadRef"
       },
+      "MatriculaAdminIn": {
+        "properties": {
+          "tipo_profesional": {
+            "type": "string",
+            "title": "Tipo Profesional",
+            "description": "Gasista | Aire acondicionado (los tipos de HU-02)."
+          },
+          "numero_matricula": {
+            "type": "string",
+            "title": "Numero Matricula",
+            "description": "Solo dígitos, con la cantidad del tipo (ver GET /matriculas/tipos)."
+          }
+        },
+        "type": "object",
+        "required": [
+          "tipo_profesional",
+          "numero_matricula"
+        ],
+        "title": "MatriculaAdminIn",
+        "description": "Modal \"Validar Matrícula\" del administrador (HU-07 CA03). Sin consulta al padrón.",
+        "example": {
+          "numero_matricula": "1000008919",
+          "tipo_profesional": "Gasista"
+        }
+      },
       "MatriculaOut": {
         "properties": {
           "id_matricula": {
@@ -3006,18 +4062,40 @@
             "title": "Numero Matricula"
           },
           "categoria": {
-            "type": "string",
-            "title": "Categoria"
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Categoria",
+            "description": "Null si la validó el administrador (sin padrón)."
           },
           "fecha_vencimiento": {
-            "type": "string",
-            "format": "date",
-            "title": "Fecha Vencimiento"
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Fecha Vencimiento",
+            "description": "Null si la validó el administrador (sin padrón)."
           },
           "fecha_fidelizacion": {
             "type": "string",
             "format": "date-time",
             "title": "Fecha Fidelizacion"
+          },
+          "origen": {
+            "type": "string",
+            "title": "Origen",
+            "description": "Padron | Administrador.",
+            "default": "Padron"
           }
         },
         "type": "object",
@@ -3025,8 +4103,6 @@
           "id_matricula",
           "tipo_profesional",
           "numero_matricula",
-          "categoria",
-          "fecha_vencimiento",
           "fecha_fidelizacion"
         ],
         "title": "MatriculaOut"
@@ -3084,6 +4160,18 @@
               }
             ],
             "title": "Resena Id"
+          },
+          "oferente_id": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Oferente Id",
+            "description": "Profesional al que se refiere (campana del administrador)."
           },
           "nombre_cliente": {
             "anyOf": [
@@ -3232,6 +4320,252 @@
           "telefono_cliente_numero": "6924551",
           "tipo": "Resena_Nueva"
         }
+      },
+      "OferenteAdminDetalle": {
+        "properties": {
+          "id_oferente": {
+            "type": "integer",
+            "title": "Id Oferente"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "apellido": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido"
+          },
+          "foto_perfil_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto Perfil Url"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Activo",
+              "Suspendido"
+            ],
+            "title": "Estado",
+            "description": "Activo si la cuenta está activa; Suspendido en otro caso."
+          },
+          "estado_cuenta": {
+            "type": "string",
+            "title": "Estado Cuenta",
+            "description": "Valor crudo de la cuenta: Activa | Suspendida | Bloqueada."
+          },
+          "categoria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CategoriaRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "El rubro."
+          },
+          "especialidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Especialidad"
+          },
+          "matricula_verificada": {
+            "type": "boolean",
+            "title": "Matricula Verificada",
+            "description": "true si tiene al menos una matrícula fidelizada (con el ícono de check)."
+          },
+          "matriculas": {
+            "items": {
+              "$ref": "#/components/schemas/MatriculaRef"
+            },
+            "type": "array",
+            "title": "Matriculas"
+          },
+          "promedio_calificacion": {
+            "type": "number",
+            "title": "Promedio Calificacion"
+          },
+          "cantidad_resenas": {
+            "type": "integer",
+            "title": "Cantidad Resenas",
+            "description": "Reseñas visibles (publicadas y no dadas de baja)."
+          },
+          "cantidad_trabajos": {
+            "type": "integer",
+            "title": "Cantidad Trabajos",
+            "description": "Trabajos visibles (no dados de baja)."
+          },
+          "cantidad_rechazadas": {
+            "type": "integer",
+            "title": "Cantidad Rechazadas",
+            "description": "Reseñas rechazadas por el Profesional, en total."
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "email": {
+            "type": "string",
+            "title": "Email"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_oferente",
+          "nombre",
+          "estado",
+          "estado_cuenta",
+          "matricula_verificada",
+          "promedio_calificacion",
+          "cantidad_resenas",
+          "cantidad_trabajos",
+          "cantidad_rechazadas",
+          "email"
+        ],
+        "title": "OferenteAdminDetalle",
+        "description": "Tarjeta del Profesional en \"Moderar Reseñas\" y \"Auditar Trabajos\"."
+      },
+      "OferenteAdminFila": {
+        "properties": {
+          "id_oferente": {
+            "type": "integer",
+            "title": "Id Oferente"
+          },
+          "nombre": {
+            "type": "string",
+            "title": "Nombre"
+          },
+          "apellido": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Apellido"
+          },
+          "foto_perfil_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto Perfil Url"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Activo",
+              "Suspendido"
+            ],
+            "title": "Estado",
+            "description": "Activo si la cuenta está activa; Suspendido en otro caso."
+          },
+          "estado_cuenta": {
+            "type": "string",
+            "title": "Estado Cuenta",
+            "description": "Valor crudo de la cuenta: Activa | Suspendida | Bloqueada."
+          },
+          "categoria": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/CategoriaRef"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "El rubro."
+          },
+          "especialidad": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Especialidad"
+          },
+          "matricula_verificada": {
+            "type": "boolean",
+            "title": "Matricula Verificada",
+            "description": "true si tiene al menos una matrícula fidelizada (con el ícono de check)."
+          },
+          "matriculas": {
+            "items": {
+              "$ref": "#/components/schemas/MatriculaRef"
+            },
+            "type": "array",
+            "title": "Matriculas"
+          },
+          "promedio_calificacion": {
+            "type": "number",
+            "title": "Promedio Calificacion"
+          },
+          "cantidad_resenas": {
+            "type": "integer",
+            "title": "Cantidad Resenas",
+            "description": "Reseñas visibles (publicadas y no dadas de baja)."
+          },
+          "cantidad_trabajos": {
+            "type": "integer",
+            "title": "Cantidad Trabajos",
+            "description": "Trabajos visibles (no dados de baja)."
+          },
+          "cantidad_rechazadas": {
+            "type": "integer",
+            "title": "Cantidad Rechazadas",
+            "description": "Reseñas rechazadas por el Profesional, en total."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_oferente",
+          "nombre",
+          "estado",
+          "estado_cuenta",
+          "matricula_verificada",
+          "promedio_calificacion",
+          "cantidad_resenas",
+          "cantidad_trabajos",
+          "cantidad_rechazadas"
+        ],
+        "title": "OferenteAdminFila",
+        "description": "Una fila de la grilla \"Gestión de Oferentes\" (HU-07 CA02)."
       },
       "OferenteEdicion": {
         "properties": {
@@ -4040,6 +5374,47 @@
           "telefono_numero": "400111"
         }
       },
+      "OferentesAdminPaginadosOut": {
+        "properties": {
+          "items": {
+            "items": {
+              "$ref": "#/components/schemas/OferenteAdminFila"
+            },
+            "type": "array",
+            "title": "Items"
+          },
+          "contadores": {
+            "$ref": "#/components/schemas/ContadoresOferentes"
+          },
+          "pagina": {
+            "type": "integer",
+            "title": "Pagina"
+          },
+          "por_pagina": {
+            "type": "integer",
+            "title": "Por Pagina"
+          },
+          "total": {
+            "type": "integer",
+            "title": "Total",
+            "description": "Cantidad de resultados con el filtro y la búsqueda aplicados."
+          },
+          "total_paginas": {
+            "type": "integer",
+            "title": "Total Paginas"
+          }
+        },
+        "type": "object",
+        "required": [
+          "items",
+          "contadores",
+          "pagina",
+          "por_pagina",
+          "total",
+          "total_paginas"
+        ],
+        "title": "OferentesAdminPaginadosOut"
+      },
       "OferentesPaginadosOut": {
         "properties": {
           "items": {
@@ -4223,6 +5598,45 @@
         ],
         "title": "ReemplazoResueltoOut"
       },
+      "ReplicaCreate": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "title": "Texto",
+            "description": "Entre 1 y 500 caracteres, sin contar los espacios de los extremos."
+          }
+        },
+        "additionalProperties": false,
+        "type": "object",
+        "required": [
+          "texto"
+        ],
+        "title": "ReplicaCreate",
+        "description": "Respuesta del Profesional a una reseña publicada (HU-01 v2.1, CA02/CA05).",
+        "example": {
+          "texto": "Muchas gracias, fue un gusto trabajar con vos."
+        }
+      },
+      "ReplicaOut": {
+        "properties": {
+          "texto": {
+            "type": "string",
+            "title": "Texto"
+          },
+          "fecha_creacion": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Creacion",
+            "description": "Cuándo el Profesional respondió."
+          }
+        },
+        "type": "object",
+        "required": [
+          "texto",
+          "fecha_creacion"
+        ],
+        "title": "ReplicaOut"
+      },
       "ResenaAdminOut": {
         "properties": {
           "id_resena": {
@@ -4320,6 +5734,96 @@
         "example": {
           "aceptar": true
         }
+      },
+      "ResenaModeracionOut": {
+        "properties": {
+          "id_resena": {
+            "type": "integer",
+            "title": "Id Resena"
+          },
+          "nombre_cliente": {
+            "type": "string",
+            "title": "Nombre Cliente"
+          },
+          "puntuacion_global": {
+            "type": "number",
+            "title": "Puntuacion Global"
+          },
+          "criterios": {
+            "type": "object",
+            "title": "Criterios"
+          },
+          "comentario": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Comentario"
+          },
+          "fecha_creacion": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Creacion"
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Aceptada",
+              "Rechazada",
+              "Dada_de_baja"
+            ],
+            "title": "Estado"
+          },
+          "dado_de_baja_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dado De Baja En"
+          },
+          "replica": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaOut"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "puede_dar_de_baja": {
+            "type": "boolean",
+            "title": "Puede Dar De Baja",
+            "description": "true solo para las aceptadas que siguen visibles."
+          },
+          "puede_reactivar": {
+            "type": "boolean",
+            "title": "Puede Reactivar",
+            "description": "true solo para las dadas de baja."
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_resena",
+          "nombre_cliente",
+          "puntuacion_global",
+          "criterios",
+          "fecha_creacion",
+          "estado",
+          "puede_dar_de_baja",
+          "puede_reactivar"
+        ],
+        "title": "ResenaModeracionOut",
+        "description": "Una opinión en \"Moderar Reseñas\" (HU-07 CA04/CA05). Lo ve solo el administrador."
       },
       "ResenaOut": {
         "properties": {
@@ -4482,6 +5986,23 @@
             "format": "date-time",
             "title": "Fecha Creacion",
             "description": "Cuándo la cargó el cliente, no cuándo la aceptó el Profesional."
+          },
+          "replica": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ReplicaOut"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "description": "Respuesta única del Profesional, o null si no respondió."
+          },
+          "puede_responder": {
+            "type": "boolean",
+            "title": "Puede Responder",
+            "description": "true solo para el Profesional dueño, con sesión, cuando la reseña todavía no tiene réplica.",
+            "default": false
           }
         },
         "type": "object",
@@ -4990,6 +6511,83 @@
           ],
           "titulo": "Cambio de disyuntor"
         }
+      },
+      "TrabajoModeracionOut": {
+        "properties": {
+          "id_trabajo": {
+            "type": "integer",
+            "title": "Id Trabajo"
+          },
+          "titulo": {
+            "type": "string",
+            "title": "Titulo"
+          },
+          "descripcion": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Descripcion"
+          },
+          "fecha_creacion": {
+            "type": "string",
+            "format": "date-time",
+            "title": "Fecha Creacion"
+          },
+          "foto_principal_url": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Foto Principal Url",
+            "description": "Foto con orden 1. Es la que muestra la tarjeta."
+          },
+          "fotos": {
+            "items": {
+              "$ref": "#/components/schemas/FotoTrabajoOut"
+            },
+            "type": "array",
+            "title": "Fotos",
+            "description": "Todas las fotos ordenadas. Alimenta el carrusel."
+          },
+          "estado": {
+            "type": "string",
+            "enum": [
+              "Activo",
+              "Dado_de_baja"
+            ],
+            "title": "Estado"
+          },
+          "dado_de_baja_en": {
+            "anyOf": [
+              {
+                "type": "string",
+                "format": "date-time"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Dado De Baja En"
+          }
+        },
+        "type": "object",
+        "required": [
+          "id_trabajo",
+          "titulo",
+          "fecha_creacion",
+          "estado"
+        ],
+        "title": "TrabajoModeracionOut",
+        "description": "Un trabajo en \"Auditar Trabajos Realizados\" (HU-07 CA04/CA05)."
       },
       "TrabajoOut": {
         "properties": {

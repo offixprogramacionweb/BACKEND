@@ -1,11 +1,11 @@
 from fastapi import APIRouter, Depends, HTTPException, Query, status
 from sqlalchemy.orm import Session
 
-from app.core.deps import get_current_user, get_oferente_registrado
+from app.core.deps import get_current_user, get_oferente_registrado, get_usuario_opcional_tolerante
 from app.core.errores import error_negocio, error_validacion
 from app.db.database import get_db
 from app.models.oferente import Oferente
-from app.models.usuario import Usuario
+from app.models.usuario import EstadoCuenta, RolUsuario, Usuario
 from app.schemas.oferente import OferenteEdicion, OferentePrivadoOut, OferentePublicoOut, OferenteRegistro, OferentesPaginadosOut
 from app.services.oferentes import aplicar_edicion, armar_privada, armar_publica, buscar_publicos, crear_oferente
 
@@ -120,13 +120,21 @@ def actualizar_mi_perfil(
     "/{oferente_id}",
     response_model=OferentePublicoOut,
     summary="Consultar el perfil de un profesional (público)",
-    responses={404: {"description": "Oferente no encontrado"}},
+    responses={404: {"description": "Oferente no encontrado (o suspendido, salvo para un Administrador)"}},
 )
-def obtener_oferente(oferente_id: int, db: Session = Depends(get_db)):
+def obtener_oferente(
+    oferente_id: int,
+    db: Session = Depends(get_db),
+    usuario: Usuario | None = Depends(get_usuario_opcional_tolerante),
+):
     """RF7 — Perfil público. No devuelve DNI/CUIT, estado de verificación ni
-    rechazos acumulados."""
+    rechazos acumulados. HU-07 A5: un Profesional suspendido no tiene perfil
+    público; el Administrador sí lo puede ver."""
     oferente = db.get(Oferente, oferente_id)
     if not oferente:
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Oferente no encontrado")
+    es_admin = usuario is not None and usuario.rol == RolUsuario.ADMINISTRADOR
+    if oferente.usuario.estado_cuenta != EstadoCuenta.ACTIVA and not es_admin:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Oferente no encontrado")
     return armar_publica(db, oferente)
 

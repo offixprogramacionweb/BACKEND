@@ -12,8 +12,10 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.notificacion import EstadoNotificacion, Notificacion, TipoNotificacion
+from app.models.oferente import Oferente
 from app.models.resena import Resena
 from app.models.solicitud_resena import SolicitudResena
+from app.models.usuario import EstadoCuenta, RolUsuario, Usuario
 
 
 def _contacto_del_cliente(solicitud: SolicitudResena) -> str:
@@ -65,3 +67,62 @@ def resolver_notificacion_de_resena(db: Session, resena: Resena, aceptada: bool)
     notificacion.fecha_resolucion = datetime.now(timezone.utc)
     db.flush()
     return notificacion
+
+
+def administradores_activos(db: Session) -> list[Usuario]:
+    return (
+        db.query(Usuario)
+        .filter(Usuario.rol == RolUsuario.ADMINISTRADOR, Usuario.estado_cuenta == EstadoCuenta.ACTIVA)
+        .all()
+    )
+
+
+def notificar_rechazos_reiterados(db: Session, oferente: Oferente) -> None:
+    """HU-07 CA08: aviso en la campana de cada administrador activo cuando un
+    Profesional llega a 5 o más reseñas rechazadas. Si el administrador ya tiene
+    uno pendiente de ese Profesional, no se repite (A20)."""
+    mensaje = (
+        f"El profesional {oferente.nombre_completo} rechazó 5 o más reseñas a través de Offix"
+    )
+    for administrador in administradores_activos(db):
+        ya_pendiente = (
+            db.query(Notificacion.id_notificacion)
+            .filter(
+                Notificacion.usuario_id == administrador.id_usuario,
+                Notificacion.tipo == TipoNotificacion.RECHAZOS_REITERADOS,
+                Notificacion.oferente_id == oferente.id_oferente,
+                Notificacion.estado == EstadoNotificacion.PENDIENTE,
+            )
+            .first()
+        )
+        if ya_pendiente is None:
+            db.add(
+                Notificacion(
+                    usuario_id=administrador.id_usuario,
+                    tipo=TipoNotificacion.RECHAZOS_REITERADOS,
+                    mensaje=mensaje,
+                    requiere_accion=False,
+                    estado=EstadoNotificacion.PENDIENTE,
+                    oferente_id=oferente.id_oferente,
+                )
+            )
+    db.flush()
+
+
+def notificar_reactivacion(db: Session, oferente: Oferente) -> None:
+    """HU-07 CA06: aviso a los administradores cuando se da de alta un Profesional."""
+    mensaje = (
+        f"El oferente {oferente.nombre_completo} fue reactivado y podrá volver a operar e iniciar sesión con normalidad."
+    )
+    for administrador in administradores_activos(db):
+        db.add(
+            Notificacion(
+                usuario_id=administrador.id_usuario,
+                tipo=TipoNotificacion.OFERENTE_REACTIVADO,
+                mensaje=mensaje,
+                requiere_accion=False,
+                estado=EstadoNotificacion.PENDIENTE,
+                oferente_id=oferente.id_oferente,
+            )
+        )
+    db.flush()

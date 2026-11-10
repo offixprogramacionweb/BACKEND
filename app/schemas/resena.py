@@ -185,6 +185,34 @@ class ResenaModeracion(BaseModel):
     aceptar: bool = Field(description="true = aceptar y publicar la reseña; false = rechazarla.")
 
 
+LARGO_MAXIMO_REPLICA = 500
+
+
+class ReplicaCreate(BaseModel):
+    """Respuesta del Profesional a una reseña publicada (HU-01 v2.1, CA02/CA05)."""
+
+    model_config = ConfigDict(extra="forbid", json_schema_extra={"example": {"texto": "Muchas gracias, fue un gusto trabajar con vos."}})
+
+    texto: str = Field(description="Entre 1 y 500 caracteres, sin contar los espacios de los extremos.")
+
+    @field_validator("texto")
+    @classmethod
+    def validar_texto(cls, valor: str) -> str:
+        valor = valor.strip()
+        if not valor:
+            raise PydanticCustomError("comentario_requerido", "Debe ingresar un comentario para poder responder la reseña.")
+        if len(valor) > LARGO_MAXIMO_REPLICA:
+            raise PydanticCustomError("comentario_demasiado_largo", "El comentario no puede superar los 500 caracteres.")
+        return valor
+
+
+class ReplicaOut(BaseModel):
+    model_config = ConfigDict(from_attributes=True)
+
+    texto: str
+    fecha_creacion: datetime = Field(description="Cuándo el Profesional respondió.")
+
+
 class ResenaPublicaOut(BaseModel):
     """Una tarjeta de la pestaña "Opiniones" (HU-01 T07, D11, D12). Sin contacto
     del cliente, sin estado (siempre Aceptada) y con el nombre reducido a
@@ -209,6 +237,11 @@ class ResenaPublicaOut(BaseModel):
     criterios: dict = Field(description="Puntualidad, precio, calidad y atención (de 0.5 a 5 en pasos de 0.5).")
     comentario: str | None = None
     fecha_creacion: datetime = Field(description="Cuándo la cargó el cliente, no cuándo la aceptó el Profesional.")
+    replica: ReplicaOut | None = Field(default=None, description="Respuesta única del Profesional, o null si no respondió.")
+    puede_responder: bool = Field(
+        default=False,
+        description="true solo para el Profesional dueño, con sesión, cuando la reseña todavía no tiene réplica.",
+    )
 
 
 class ResenasPaginadasOut(BaseModel):

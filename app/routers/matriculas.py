@@ -14,7 +14,7 @@ from app.schemas.matricula import (
     ValidacionMatriculaIn,
     ValidacionMatriculaOut,
 )
-from app.services.matriculas import MENSAJES_RESULTADO, RANGO_DIGITOS_POR_TIPO, validar_matricula
+from app.services.matriculas import MENSAJES_RESULTADO, RANGO_DIGITOS_POR_TIPO, validar_formato_matricula, validar_matricula
 
 router = APIRouter(prefix="/api/v1/oferentes/me/matriculas", tags=["Matrículas"])
 
@@ -65,16 +65,7 @@ def crear_validacion(
     para Aire acondicionado— simula un padrón que no responde, así que la
     respuesta `Timeout` llega recién al cumplirse ese tiempo.
     """
-    minimo, maximo = RANGO_DIGITOS_POR_TIPO[payload.tipo_profesional]
-    numero = payload.numero_matricula
-    if numero and not numero.isdigit():
-        raise error_validacion("numero_matricula", "solo_digitos", "El número de matrícula solo puede tener dígitos")
-    if not (minimo <= len(numero) <= maximo):
-        if minimo == maximo:
-            raise error_validacion("numero_matricula", "digitos_invalidos", f"Debe ingresar {maximo} dígitos")
-        raise error_validacion(
-            "numero_matricula", "digitos_invalidos", f"Debe ingresar entre {minimo} y {maximo} dígitos"
-        )
+    validar_formato_matricula(payload.tipo_profesional, payload.numero_matricula)
 
     oferente = _oferente_actual(db, usuario)
     validacion = validar_matricula(db, oferente, payload.tipo_profesional, payload.numero_matricula)

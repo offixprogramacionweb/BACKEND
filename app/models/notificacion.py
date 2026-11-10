@@ -15,6 +15,8 @@ class TipoNotificacion:
     MATRICULA_REEMPLAZO_SOLICITADO = "Matricula_Reemplazo_Solicitado"
     MATRICULA_REEMPLAZO_PENDIENTE = "Matricula_Reemplazo_Pendiente"
     MATRICULA_REEMPLAZO_RESUELTO = "Matricula_Reemplazo_Resuelto"
+    RECHAZOS_REITERADOS = "Rechazos_Reiterados"
+    OFERENTE_REACTIVADO = "Oferente_Reactivado"
 
 
 class EstadoNotificacion:
@@ -48,6 +50,10 @@ class Notificacion(Base):
 
     resena_id = Column(Integer, ForeignKey("resenas.id_resena", ondelete="CASCADE"), nullable=True)
 
+    # HU-07 (campana del administrador): el Profesional al que se refiere la
+    # notificación, para el botón "Ver opiniones". NULL en las demás.
+    oferente_id = Column(Integer, ForeignKey("oferentes.id_oferente", ondelete="CASCADE"), nullable=True)
+
     # HU-02: seteado en las notificaciones de matrícula (avisos al Oferente y
     # pedido de reemplazo al Administrador). NULL en las de reseña.
     validacion_matricula_id = Column(
@@ -62,6 +68,7 @@ class Notificacion(Base):
     usuario = relationship("Usuario", back_populates="notificaciones")
     resena = relationship("Resena", back_populates="notificaciones")
     validacion_matricula = relationship("ValidacionMatricula")
+    oferente = relationship("Oferente")
 
 
 Index("idx_notificacion_usuario_estado", Notificacion.usuario_id, Notificacion.estado)

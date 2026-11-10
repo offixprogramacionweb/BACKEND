@@ -41,9 +41,10 @@ class MatriculaOut(BaseModel):
     id_matricula: int
     tipo_profesional: str
     numero_matricula: str
-    categoria: str
-    fecha_vencimiento: date
+    categoria: str | None = Field(default=None, description="Null si la validó el administrador (sin padrón).")
+    fecha_vencimiento: date | None = Field(default=None, description="Null si la validó el administrador (sin padrón).")
     fecha_fidelizacion: datetime
+    origen: str = Field(default="Padron", description="Padron | Administrador.")
 
 
 class ValidacionMatriculaOut(BaseModel):
